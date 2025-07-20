@@ -1,0 +1,96 @@
+name: 🔨 Build APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Tipo de build'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 📥 Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: ☕ Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: 🐍 Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: 🦋 Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.9'
+        channel: 'stable'
+        cache: true
+
+    - name: 📦 Install Flet
+      run: |
+        pip install --upgrade pip
+        pip install flet
+
+    - name: 🔧 Configure Flutter
+      run: |
+        flutter config --android-sdk $ANDROID_HOME
+        flutter doctor -v
+
+    - name: 🏗️ Build APK Debug
+      if: github.event.inputs.release_type == 'debug' || github.event.inputs.release_type == ''
+      run: |
+        flet build apk \
+          --project "Gestão Financeira Premium" \
+          --description "Controle financeiro pessoal elegante" \
+          --org "com.financeiro.premium" \
+          --template "adaptive" \
+          --verbose
+
+    - name: 🏗️ Build APK Release
+      if: github.event.inputs.release_type == 'release'
+      run: |
+        flet build apk \
+          --project "Gestão Financeira Premium" \
+          --description "Controle financeiro pessoal elegante" \
+          --org "com.financeiro.premium" \
+          --template "adaptive" \
+          --release \
+          --verbose
+
+    - name: 📱 Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: gestao-financeira-apk-${{ github.run_number }}
+        path: |
+          build/app/outputs/flutter-apk/*.apk
+          build/app/outputs/bundle/release/*.aab
+        retention-days: 30
+
+    - name: 📊 APK Info
+      run: |
+        echo "📱 APK gerado com sucesso!"
+        ls -la build/app/outputs/flutter-apk/
+        if [ -f "build/app/outputs/flutter-apk/app-release.apk" ]; then
+          echo "📦 Tamanho do APK Release:"
+          du -h build/app/outputs/flutter-apk/app-release.apk
+        fi
+        if [ -f "build/app/outputs/flutter-apk/app-debug.apk" ]; then
+          echo "📦 Tamanho do APK Debug:"
+          du -h build/app/outputs/flutter-apk/app-debug.apk
+        fi
