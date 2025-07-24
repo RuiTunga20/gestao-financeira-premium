@@ -1,0 +1,178 @@
+# pubspec.yaml - Configuração para builds móveis
+name: teste_flet_build
+description: Aplicação de teste para builds Flet APK e Windows
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=2.17.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flet: ^0.27.5
+  window_manager: ^0.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+  
+  # Assets (se necessário)
+  # assets:
+  #   - assets/images/
+  
+  # Ícones da aplicação
+  # flutter_icons:
+  #   android: true
+  #   ios: true
+  #   image_path: "assets/icon.png"
+
+---
+# requirements.txt
+flet==0.27.5
+
+---
+# pyproject.toml - Configuração Python moderna
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "teste-flet-build"
+version = "1.0.0"
+description = "Aplicação de teste para builds Flet"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "flet>=0.27.5",
+]
+
+[project.scripts]
+teste-flet = "main:main"
+
+---
+# .flet - Configuração específica do Flet
+name: TesteFletBuild
+description: Aplicação de teste para GitHub Actions
+author: Seu Nome
+version: 1.0.0
+
+# Configurações de build
+build:
+  # Configurações gerais
+  output_dir: build
+  
+  # Configurações Android
+  android:
+    package_name: com.exemplo.testefletbuild
+    permissions:
+      - android.permission.INTERNET
+      - android.permission.WRITE_EXTERNAL_STORAGE
+      - android.permission.READ_EXTERNAL_STORAGE
+    
+    # Ícone da aplicação (opcional)
+    # icon: assets/icon.png
+    
+    # Splash screen (opcional) 
+    # splash_image: assets/splash.png
+    # splash_color: "#FFFFFF"
+  
+  # Configurações Windows
+  windows:
+    icon: assets/icon.ico # opcional
+    
+  # Configurações macOS  
+  macos:
+    icon: assets/icon.icns # opcional
+    
+  # Configurações Linux
+  linux:
+    icon: assets/icon.png # opcional
+
+---
+# .gitignore
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Arquivos Flet
+.flet/
+
+# Arquivos Flutter/Dart
+**/android/**/gradle-wrapper.jar
+**/android/.gradle
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/local.properties
+**/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+*.jks
+
+# iOS/XCode
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/.symlinks/
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/.generated/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+test.json
