@@ -183,7 +183,7 @@ jobs:
         name: apk-build-artifact
         path: build/apk
         if-no-files-found: warn
-        overwrite: false
+        overwrite: true
 
   build-ipa:
     runs-on: macos-latest
