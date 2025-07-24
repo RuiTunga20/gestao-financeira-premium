@@ -1008,13 +1008,26 @@ class FinancialApp:
         """Configura navegação"""
         self.navigation_bar = ft.NavigationBar(
             destinations=[
-                ft.NavigationDestination(icon=ft.icons.CREDIT_CARD_OUTLINED, label="Despesas",
-                                         selected_icon=ft.icons.CREDIT_CARD),
-                ft.NavigationDestination(icon=ft.icons.SAVINGS_OUTLINED, label="Metas", selected_icon=ft.icons.SAVINGS),
-                ft.NavigationDestination(icon=ft.icons.ACCOUNT_BALANCE_OUTLINED, label="Renda & Dívidas",
-                                         selected_icon=ft.icons.ACCOUNT_BALANCE),
-                ft.NavigationDestination(icon=ft.icons.ANALYTICS_OUTLINED, label="Dashboard",
-                                         selected_icon=ft.icons.ANALYTICS)
+                ft.NavigationBarDestination(
+                    icon=ft.icons.CREDIT_CARD_OUTLINED,
+                    label="Despesas",
+                    selected_icon=ft.icons.CREDIT_CARD
+                ),
+                ft.NavigationBarDestination(
+                    icon=ft.icons.SAVINGS_OUTLINED,
+                    label="Metas",
+                    selected_icon=ft.icons.SAVINGS
+                ),
+                ft.NavigationBarDestination(
+                    icon=ft.icons.ACCOUNT_BALANCE_OUTLINED,
+                    label="Renda & Dívidas",
+                    selected_icon=ft.icons.ACCOUNT_BALANCE
+                ),
+                ft.NavigationBarDestination(
+                    icon=ft.icons.ANALYTICS_OUTLINED,
+                    label="Dashboard",
+                    selected_icon=ft.icons.ANALYTICS
+                )
             ],
             on_change=self.navigation_changed,
             bgcolor="#FFFFFF",
