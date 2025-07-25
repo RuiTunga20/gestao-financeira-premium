@@ -22,10 +22,21 @@ class FinancialApp:
         self.page.theme_mode = ft.ThemeMode.LIGHT
         self.page.bgcolor = "#FAFBFF"
         self.page.padding = 0
+
         # Configuração mobile-first
         self.page.window.width = 400
         self.page.window.height = 800
         self.page.window.resizable = True
+
+        # Configurações para melhor comportamento com teclado
+        self.page.adaptive = True  # Se adapta ao dispositivo
+        self.page.keyboard_brightness = ft.Brightness.LIGHT  # Teclado claro
+
+        # Configuração de scroll suave
+        self.page.scroll = ft.ScrollMode.AUTO
+
+        # Remove barra superior padrão para controle total
+        self.page.appbar = None
 
     def load_data(self):
         """Carrega dados do client_storage"""
@@ -169,7 +180,7 @@ class FinancialApp:
         )
 
     def create_fixed_header(self):
-        """Cria cabeçalho fixo"""
+        """Cria cabeçalho fixo compacto"""
         headers = [
             "💳 Controle Financeiro",
             "🎯 Metas & Objetivos",
@@ -177,43 +188,72 @@ class FinancialApp:
             "📊 Dashboard"
         ]
 
-        return ft.Container(
-            content=ft.Row([
-                ft.Text(
-                    headers[self.current_view_index],
-                    size=20,
-                    weight=ft.FontWeight.BOLD,
-                    color="#1F2937"
-                )
-            ], alignment=ft.MainAxisAlignment.CENTER),
-            bgcolor="#FFFFFF",
-            padding=ft.padding.symmetric(vertical=16, horizontal=20),
-            border=ft.border.only(bottom=ft.BorderSide(1, "#E5E7EB")),
-            shadow=ft.BoxShadow(
-                spread_radius=0,
-                blur_radius=4,
-                color="#1F293720",
-                offset=ft.Offset(0, 2)
-            )
+        # Criar referência ao texto para poder atualizar depois
+        self.header_text = ft.Text(
+            headers[self.current_view_index],
+            size=18,
+            weight=ft.FontWeight.BOLD,
+            color="#1F2937"
         )
 
-    def close_dialog(self):
-        """Fecha diálogo/bottom sheet de forma limpa"""
+        return ft.Container(
+            content=ft.Row([
+                self.header_text
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            padding=ft.padding.symmetric(vertical=12, horizontal=20),
+            height=70,
+            alignment=ft.alignment.center
+        )
+
+    def show_snack_bar(self, message, bgcolor="#059669"):
+        """Método moderno para mostrar notificações"""
+        try:
+            snack_bar = ft.SnackBar(
+                content=ft.Text(message, color="#FFFFFF"),
+                bgcolor=bgcolor,
+                action="OK",
+                action_color="#FFFFFF"
+            )
+            self.page.overlay.append(snack_bar)
+            snack_bar.open = True
+            self.page.update()
+        except Exception as e:
+            print(f"Erro ao mostrar snack bar: {e}")
+        """Fecha diálogo de forma limpa"""
         try:
             print("Fechando diálogo...")
 
-            # Fecha bottom sheet
-            if hasattr(self.page, 'bottom_sheet') and self.page.bottom_sheet:
-                self.page.bottom_sheet.open = False
-                self.page.bottom_sheet = None
-
-            # Fecha diálogo regular (fallback)
+            # Fecha diálogo usando método moderno
             if hasattr(self.page, 'dialog') and self.page.dialog:
                 self.page.dialog.open = False
-                self.page.dialog = None
 
             # Reset do controle manual
             self.dialog_open = False
+
+            # Atualização única
+            self.page.update()
+
+            print("Diálogo fechado com sucesso!")
+
+        except Exception as e:
+            print(f"Erro ao fechar diálogo: {e}")
+            self.dialog_open = False
+
+    def close_dialog(self):
+        """Fecha diálogo de forma limpa"""
+        try:
+            print("Fechando diálogo...")
+
+            # Método mais direto e compatível
+            self.dialog_open = False
+
+            # Tenta fechar o diálogo se existir
+            try:
+                if hasattr(self.page, 'dialog') and self.page.dialog:
+                    self.page.dialog.open = False
+                    self.page.dialog = None
+            except:
+                pass
 
             # Atualização única
             self.page.update()
@@ -234,19 +274,9 @@ class FinancialApp:
                 self.save_data()
                 self.update_all_views()
 
-                self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("💰 Salário salvo!"),
-                    bgcolor="#059669"
-                )
-                self.page.snack_bar.open = True
-                self.page.update()
+                self.show_snack_bar("💰 Salário salvo!", "#059669")
         except ValueError:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Valor inválido!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Valor inválido!", "#DC2626")
 
     def create_components(self):
         """Cria todos os componentes da interface"""
@@ -744,7 +774,7 @@ class FinancialApp:
         )
 
     def setup_layout(self):
-        """Configura o layout com header fixo, conteúdo scrollable e navegação fixa"""
+        """Configura o layout com header e navegação REALMENTE FIXOS"""
         # Header fixo
         self.header = self.create_fixed_header()
 
@@ -752,7 +782,7 @@ class FinancialApp:
         self.content_container = ft.Container(
             content=self.finances_view,
             expand=True,
-            padding=ft.padding.only(left=12, right=12, top=12, bottom=20)  # Padding extra no fundo
+            padding=ft.padding.only(left=12, right=12, top=8, bottom=8)
         )
 
         # Navegação fixa
@@ -768,37 +798,70 @@ class FinancialApp:
                                             selected_icon=ft.Icons.ANALYTICS)
             ],
             on_change=self.navigation_changed,
-            bgcolor="transparent",  # Transparente para mostrar o container por trás
+            bgcolor="#FFFFFF",
             indicator_color="#EFF6FF",
             selected_index=0,
             label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-            height=64,  # Altura ligeiramente maior
-            surface_tint_color="#FFFFFF"
+            height=64
         )
 
-        # Layout principal com header fixo, conteúdo e navegação fixa
-        self.page.add(
-            ft.Column([
-                self.header,  # Header fixo no topo
-                self.content_container,  # Conteúdo scrollable no meio
-                ft.Container(
-                    content=self.navigation_bar,
-                    margin=ft.margin.only(bottom=8),  # Espaço acima da navegação
-                    bgcolor="#FFFFFF",
-                    border_radius=ft.border_radius.only(top_left=16, top_right=16),
-                    shadow=ft.BoxShadow(
-                        spread_radius=0,
-                        blur_radius=8,
-                        color="#1F293720",
-                        offset=ft.Offset(0, -2)
-                    )
-                )  # Navegação fixa no fundo com espaçamento
-            ], expand=True, spacing=0)
-        )
+        # Layout usando Stack para posicionamento absoluto (REALMENTE FIXO)
+        layout = ft.Stack([
+            # Conteúdo principal
+            ft.Container(
+                content=ft.Column([
+                    # Espaço para o header
+                    ft.Container(height=70),
+                    # Conteúdo scrollable
+                    ft.Container(
+                        content=self.content_container,
+                        expand=True
+                    ),
+                    # Espaço para a navegação
+                    ft.Container(height=72)
+                ]),
+                expand=True
+            ),
+
+            # Header fixo no topo
+            ft.Container(
+                content=self.header,
+                top=0,
+                left=0,
+                right=0,
+                height=70,
+                bgcolor="#FFFFFF",
+                shadow=ft.BoxShadow(
+                    spread_radius=0,
+                    blur_radius=4,
+                    color="#1F293720",
+                    offset=ft.Offset(0, 2)
+                )
+            ),
+
+            # Navegação fixa no fundo
+            ft.Container(
+                content=self.navigation_bar,
+                bottom=0,
+                left=0,
+                right=0,
+                height=72,
+                bgcolor="#FFFFFF",
+                shadow=ft.BoxShadow(
+                    spread_radius=0,
+                    blur_radius=8,
+                    color="#1F293720",
+                    offset=ft.Offset(0, -2)
+                )
+            )
+        ])
+
+        # Adiciona o layout na página
+        self.page.add(layout)
 
     def show_add_payment_dialog(self, goal_index):
-        """BottomSheet para adicionar pagamento à meta - SE ADAPTA AO TECLADO"""
-        print(f"Abrindo bottom sheet para meta {goal_index}")
+        """Diálogo centralizado que se adapta ao teclado"""
+        print(f"Abrindo diálogo para meta {goal_index}")
 
         # Evita múltiplas chamadas
         if self.dialog_open:
@@ -862,19 +925,25 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha bottom sheet
-                self.close_dialog()
+                # Fecha diálogo usando método CORRETO do Flet
+                try:
+                    if hasattr(self.page, 'close'):
+                        self.page.close(dialog)  # Método moderno
+                    else:
+                        dialog.open = False
+                        self.page.update()
+                    self.dialog_open = False
+                except Exception as dialog_ex:
+                    print(f"Erro ao fechar diálogo: {dialog_ex}")
+                    dialog.open = False
+                    self.dialog_open = False
+                    self.page.update()
 
                 # Atualiza views
                 self.update_all_views()
 
                 # Mostra sucesso
-                self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("💰 Investimento realizado com sucesso!"),
-                    bgcolor="#059669"
-                )
-                self.page.snack_bar.open = True
-                self.page.update()
+                self.show_snack_bar("💰 Investimento realizado com sucesso!", "#059669")
 
                 print(f"Pagamento de {amount} realizado com sucesso para meta {goal_index}")
 
@@ -886,127 +955,120 @@ class FinancialApp:
                 error_text.value = f"❌ Erro: {str(ex)}"
                 self.page.update()
 
-        def close_sheet_action(e):
-            print("Fechando bottom sheet")
-            self.close_dialog()
+        def close_dialog_action(e):
+            """Handler para fechar diálogo de meta"""
+            try:
+                print("Fechando diálogo de meta")
+                if hasattr(self.page, 'close'):
+                    self.page.close(dialog)  # Método moderno
+                else:
+                    dialog.open = False
+                    self.page.update()
+                self.dialog_open = False
+            except Exception as ex:
+                print(f"Erro ao fechar diálogo de meta: {ex}")
+                dialog.open = False
+                self.dialog_open = False
+                self.page.update()
 
-        # Cria BottomSheet que se adapta ao teclado
-        bottom_sheet = ft.BottomSheet(
+        # Diálogo centralizado e responsivo ao teclado
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.SAVINGS, color="#059669", size=22),
+                ft.Text("Investir na Meta", size=16, weight=ft.FontWeight.BOLD, color="#1F2937")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
             content=ft.Container(
                 content=ft.Column([
-                    # Header com linha de arraste
-                    ft.Container(
-                        content=ft.Container(
-                            bgcolor="#E5E7EB",
-                            border_radius=3,
-                            height=4,
-                            width=40
-                        ),
-                        alignment=ft.alignment.center,
-                        padding=ft.padding.only(top=12, bottom=8)
-                    ),
-
-                    # Título e botão fechar
-                    ft.Row([
-                        ft.Text("💰 Investir na Meta", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
-                        ft.IconButton(
-                            icon=ft.Icons.CLOSE,
-                            on_click=close_sheet_action,
-                            icon_color="#6B7280",
-                            icon_size=20
-                        )
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-
-                    ft.Container(height=12),
-
-                    # Card com informações da meta
+                    # Card com informações compactas
                     ft.Container(
                         content=ft.Column([
-                            ft.Row([
-                                ft.Icon(ft.Icons.SAVINGS, color="#059669", size=20),
-                                ft.Text(f"{self.goals[goal_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
-                                        color="#1F2937", expand=True)
-                            ], spacing=8),
+                            ft.Text(f"🎯 {self.goals[goal_index]['name']}",
+                                    size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
                             ft.Container(height=8),
                             ft.Row([
                                 ft.Column([
-                                    ft.Text("Custo Total", size=11, color="#6B7280"),
-                                    ft.Text(f"{self.goals[goal_index]['total_cost']:,.0f} Kz", size=13,
-                                            weight=ft.FontWeight.BOLD, color="#1F2937")
-                                ], spacing=2),
+                                    ft.Text("Total", size=10, color="#6B7280"),
+                                    ft.Text(f"{self.goals[goal_index]['total_cost']:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                                 ft.Column([
-                                    ft.Text("Já Investido", size=11, color="#6B7280"),
-                                    ft.Text(f"{self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=13,
-                                            weight=ft.FontWeight.BOLD, color="#059669")
-                                ], spacing=2),
+                                    ft.Text("Investido", size=10, color="#6B7280"),
+                                    ft.Text(f"{self.goals[goal_index].get('saved_amount', 0):,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                                 ft.Column([
-                                    ft.Text("Saldo Disponível", size=11, color="#6B7280"),
-                                    ft.Text(f"{current_balance:,.0f} Kz", size=13, weight=ft.FontWeight.BOLD,
-                                            color="#2563EB")
-                                ], spacing=2),
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                        ], spacing=0),
+                                    ft.Text("Disponível", size=10, color="#6B7280"),
+                                    ft.Text(f"{current_balance:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#2563EB"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                            ], alignment=ft.MainAxisAlignment.SPACE_AROUND)
+                        ]),
                         bgcolor="#F8FAFC",
                         border_radius=12,
                         padding=ft.padding.all(16),
-                        border=ft.border.all(1, "#E2E8F0")
+                        border=ft.border.all(1, "#E2E8F0"),
+                        margin=ft.margin.only(bottom=16)
                     ),
 
-                    ft.Container(height=20),
-
-                    # Campo de valor
+                    # Campo de input
                     payment_field,
 
                     ft.Container(height=8),
 
                     # Texto de erro
-                    error_text,
+                    error_text
 
-                    ft.Container(height=20),
-
-                    # Botões
-                    ft.Row([
-                        ft.ElevatedButton(
-                            "Cancelar",
-                            on_click=close_sheet_action,
-                            bgcolor="#F3F4F6",
-                            color="#374151",
-                            expand=1,
-                            height=48
-                        ),
-                        ft.Container(width=12),
-                        ft.ElevatedButton(
-                            "💰 Investir",
-                            on_click=add_payment_action,
-                            bgcolor="#059669",
-                            color="#FFFFFF",
-                            expand=2,
-                            height=48
-                        )
-                    ]),
-
-                    # Espaço extra para o teclado
-                    ft.Container(height=32)
-
-                ], spacing=0, scroll=ft.ScrollMode.AUTO),
-                padding=ft.padding.symmetric(horizontal=20, vertical=0),
-                bgcolor="#FFFFFF",
-                border_radius=ft.border_radius.only(top_left=20, top_right=20)
+                ], tight=True, spacing=0),
+                width=300,  # Largura fixa para mobile
+                padding=ft.padding.all(4)
             ),
-            open=True,
-            maintain_bottom_view_insets_padding=True,  # Mantém padding quando teclado aparece
-            is_scroll_controlled=True,  # Permite scroll quando teclado aparece
-            use_safe_area=True  # Usa área segura do dispositivo
+            actions=[
+                ft.Row([
+                    ft.TextButton(
+                        "Cancelar",
+                        on_click=close_dialog_action,
+                        style=ft.ButtonStyle(
+                            color="#6B7280",
+                            overlay_color="#F3F4F6"
+                        )
+                    ),
+                    ft.ElevatedButton(
+                        "💰 Investir",
+                        on_click=add_payment_action,
+                        bgcolor="#059669",
+                        color="#FFFFFF",
+                        style=ft.ButtonStyle(
+                            shape=ft.RoundedRectangleBorder(radius=8)
+                        )
+                    )
+                ], alignment=ft.MainAxisAlignment.END, spacing=8)
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            # Propriedades para adaptação ao teclado
+            content_padding=ft.padding.all(0),
+            title_padding=ft.padding.all(20),
+            actions_padding=ft.padding.symmetric(horizontal=20, vertical=16),
+            shape=ft.RoundedRectangleBorder(radius=16),
+            # Garante que o diálogo se move com o teclado
+            bgcolor="#FFFFFF",
+            surface_tint_color="#FFFFFF"
         )
 
-        # Abre BottomSheet
-        self.page.bottom_sheet = bottom_sheet
+        # Método moderno para abrir diálogo centralizado
+        self.page.open(dialog)
+
+        # Força um update para garantir posicionamento correto
         self.page.update()
-        print(f"Bottom sheet aberto para meta {goal_index}")
+
+        print(f"Diálogo centralizado aberto para meta {goal_index}")
 
     def show_pay_debt_dialog(self, debt_index):
-        """BottomSheet para pagar dívida - SE ADAPTA AO TECLADO"""
-        print(f"Abrindo bottom sheet para dívida {debt_index}")
+        """Diálogo centralizado para pagar dívida"""
+        print(f"Abrindo diálogo para dívida {debt_index}")
 
         # Evita múltiplas chamadas
         if self.dialog_open:
@@ -1070,19 +1132,25 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha bottom sheet
-                self.close_dialog()
+                # Fecha diálogo usando método CORRETO do Flet
+                try:
+                    if hasattr(self.page, 'close'):
+                        self.page.close(dialog)  # Método moderno
+                    else:
+                        dialog.open = False
+                        self.page.update()
+                    self.dialog_open = False
+                except Exception as dialog_ex:
+                    print(f"Erro ao fechar diálogo: {dialog_ex}")
+                    dialog.open = False
+                    self.dialog_open = False
+                    self.page.update()
 
                 # Atualiza views
                 self.update_all_views()
 
                 # Mostra sucesso
-                self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("💳 Pagamento realizado com sucesso!"),
-                    bgcolor="#DC2626"
-                )
-                self.page.snack_bar.open = True
-                self.page.update()
+                self.show_snack_bar("💳 Pagamento realizado com sucesso!", "#DC2626")
 
                 print(f"Pagamento de {amount} realizado com sucesso para dívida {debt_index}")
 
@@ -1094,139 +1162,134 @@ class FinancialApp:
                 error_text.value = f"❌ Erro: {str(ex)}"
                 self.page.update()
 
-        def close_sheet_action(e):
-            print("Fechando bottom sheet de dívida")
-            self.close_dialog()
+        def close_dialog_action(e):
+            """Handler para fechar diálogo de dívida"""
+            try:
+                print("Fechando diálogo de dívida")
+                if hasattr(self.page, 'close'):
+                    self.page.close(dialog)  # Método moderno
+                else:
+                    dialog.open = False
+                    self.page.update()
+                self.dialog_open = False
+            except Exception as ex:
+                print(f"Erro ao fechar diálogo de dívida: {ex}")
+                dialog.open = False
+                self.dialog_open = False
+                self.page.update()
 
-        # Cria BottomSheet que se adapta ao teclado
-        bottom_sheet = ft.BottomSheet(
+        # Diálogo centralizado e responsivo ao teclado
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.PAYMENT, color="#DC2626", size=22),
+                ft.Text("Pagar Dívida", size=16, weight=ft.FontWeight.BOLD, color="#1F2937")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
             content=ft.Container(
                 content=ft.Column([
-                    # Header com linha de arraste
-                    ft.Container(
-                        content=ft.Container(
-                            bgcolor="#E5E7EB",
-                            border_radius=3,
-                            height=4,
-                            width=40
-                        ),
-                        alignment=ft.alignment.center,
-                        padding=ft.padding.only(top=12, bottom=8)
-                    ),
-
-                    # Título e botão fechar
-                    ft.Row([
-                        ft.Text("💳 Pagar Dívida", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
-                        ft.IconButton(
-                            icon=ft.Icons.CLOSE,
-                            on_click=close_sheet_action,
-                            icon_color="#6B7280",
-                            icon_size=20
-                        )
-                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-
-                    ft.Container(height=12),
-
-                    # Card com informações da dívida
+                    # Card com informações compactas
                     ft.Container(
                         content=ft.Column([
-                            ft.Row([
-                                ft.Icon(ft.Icons.PAYMENT, color="#DC2626", size=20),
-                                ft.Text(f"{self.debts[debt_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
-                                        color="#1F2937", expand=True)
-                            ], spacing=8),
+                            ft.Text(f"💳 {self.debts[debt_index]['name']}",
+                                    size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
                             ft.Container(height=8),
                             ft.Row([
                                 ft.Column([
-                                    ft.Text("Total", size=11, color="#6B7280"),
-                                    ft.Text(f"{self.debts[debt_index]['total_amount']:,.0f} Kz", size=13,
-                                            weight=ft.FontWeight.BOLD, color="#1F2937")
-                                ], spacing=2),
+                                    ft.Text("Total", size=10, color="#6B7280"),
+                                    ft.Text(f"{self.debts[debt_index]['total_amount']:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                                 ft.Column([
-                                    ft.Text("Já Pago", size=11, color="#6B7280"),
-                                    ft.Text(f"{self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=13,
-                                            weight=ft.FontWeight.BOLD, color="#DC2626")
-                                ], spacing=2),
+                                    ft.Text("Pago", size=10, color="#6B7280"),
+                                    ft.Text(f"{self.debts[debt_index].get('paid_amount', 0):,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#DC2626"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
                                 ft.Column([
-                                    ft.Text("Saldo Disponível", size=11, color="#6B7280"),
-                                    ft.Text(f"{current_balance:,.0f} Kz", size=13, weight=ft.FontWeight.BOLD,
-                                            color="#2563EB")
-                                ], spacing=2),
-                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
-                        ], spacing=0),
+                                    ft.Text("Disponível", size=10, color="#6B7280"),
+                                    ft.Text(f"{current_balance:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#2563EB"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                            ], alignment=ft.MainAxisAlignment.SPACE_AROUND)
+                        ]),
                         bgcolor="#FEF2F2",
                         border_radius=12,
                         padding=ft.padding.all(16),
-                        border=ft.border.all(1, "#FECACA")
+                        border=ft.border.all(1, "#FECACA"),
+                        margin=ft.margin.only(bottom=16)
                     ),
 
-                    ft.Container(height=20),
-
-                    # Campo de valor
+                    # Campo de input
                     payment_field,
 
                     ft.Container(height=8),
 
                     # Texto de erro
-                    error_text,
+                    error_text
 
-                    ft.Container(height=20),
-
-                    # Botões
-                    ft.Row([
-                        ft.ElevatedButton(
-                            "Cancelar",
-                            on_click=close_sheet_action,
-                            bgcolor="#F3F4F6",
-                            color="#374151",
-                            expand=1,
-                            height=48
-                        ),
-                        ft.Container(width=12),
-                        ft.ElevatedButton(
-                            "💳 Pagar",
-                            on_click=pay_debt_action,
-                            bgcolor="#DC2626",
-                            color="#FFFFFF",
-                            expand=2,
-                            height=48
-                        )
-                    ]),
-
-                    # Espaço extra para o teclado
-                    ft.Container(height=32)
-
-                ], spacing=0, scroll=ft.ScrollMode.AUTO),
-                padding=ft.padding.symmetric(horizontal=20, vertical=0),
-                bgcolor="#FFFFFF",
-                border_radius=ft.border_radius.only(top_left=20, top_right=20)
+                ], tight=True, spacing=0),
+                width=300,  # Largura fixa para mobile
+                padding=ft.padding.all(4)
             ),
-            open=True,
-            maintain_bottom_view_insets_padding=True,  # Mantém padding quando teclado aparece
-            is_scroll_controlled=True,  # Permite scroll quando teclado aparece
-            use_safe_area=True  # Usa área segura do dispositivo
+            actions=[
+                ft.Row([
+                    ft.TextButton(
+                        "Cancelar",
+                        on_click=close_dialog_action,
+                        style=ft.ButtonStyle(
+                            color="#6B7280",
+                            overlay_color="#F3F4F6"
+                        )
+                    ),
+                    ft.ElevatedButton(
+                        "💳 Pagar",
+                        on_click=pay_debt_action,
+                        bgcolor="#DC2626",
+                        color="#FFFFFF",
+                        style=ft.ButtonStyle(
+                            shape=ft.RoundedRectangleBorder(radius=8)
+                        )
+                    )
+                ], alignment=ft.MainAxisAlignment.END, spacing=8)
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            # Propriedades para adaptação ao teclado
+            content_padding=ft.padding.all(0),
+            title_padding=ft.padding.all(20),
+            actions_padding=ft.padding.symmetric(horizontal=20, vertical=16),
+            shape=ft.RoundedRectangleBorder(radius=16),
+            # Garante que o diálogo se move com o teclado
+            bgcolor="#FFFFFF",
+            surface_tint_color="#FFFFFF"
         )
 
-        # Abre BottomSheet
-        self.page.bottom_sheet = bottom_sheet
+        # Método moderno para abrir diálogo centralizado
+        self.page.open(dialog)
+
+        # Força um update para garantir posicionamento correto
         self.page.update()
-        print(f"Bottom sheet aberto para dívida {debt_index}")
+
+        print(f"Diálogo centralizado aberto para dívida {debt_index}")
 
     def navigation_changed(self, e):
         """Gerencia navegação e atualiza header"""
         selected_index = e.control.selected_index
         self.current_view_index = selected_index
 
-        # Atualiza header
-        self.header.content = ft.Row([
-            ft.Text(
-                ["💳 Controle Financeiro", "🎯 Metas & Objetivos", "💰 Extras & Dívidas", "📊 Dashboard"][selected_index],
-                size=20,
-                weight=ft.FontWeight.BOLD,
-                color="#1F2937"
-            )
-        ], alignment=ft.MainAxisAlignment.CENTER)
+        # Atualiza header usando referência direta
+        headers = [
+            "💳 Controle Financeiro",
+            "🎯 Metas & Objetivos",
+            "💰 Extras & Dívidas",
+            "📊 Dashboard"
+        ]
 
+        if hasattr(self, 'header_text'):
+            self.header_text.value = headers[selected_index]
+
+        # Atualiza conteúdo
         if selected_index == 0:
             self.content_container.content = self.finances_view
             self.update_finances_view()
@@ -1248,12 +1311,7 @@ class FinancialApp:
         amount_field = self.extra_income_amount.content
 
         if not description_field.value or not amount_field.value:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Preencha todos os campos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Preencha todos os campos!", "#DC2626")
             return
 
         try:
@@ -1276,19 +1334,9 @@ class FinancialApp:
 
             self.update_all_views()
 
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("💰 Renda adicionada!"),
-                bgcolor="#059669"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("💰 Renda adicionada!", "#059669")
         except ValueError:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Valor inválido!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Valor inválido!", "#DC2626")
 
     def add_expense(self, e):
         """Adiciona despesa"""
@@ -1296,12 +1344,7 @@ class FinancialApp:
         amount_field = self.expense_amount.content
 
         if not description_field.value or not amount_field.value:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Preencha todos os campos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Preencha todos os campos!", "#DC2626")
             return
 
         try:
@@ -1320,19 +1363,9 @@ class FinancialApp:
 
             self.update_all_views()
 
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("💸 Despesa adicionada!"),
-                bgcolor="#EC4899"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("💸 Despesa adicionada!", "#EC4899")
         except ValueError:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Valor inválido!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Valor inválido!", "#DC2626")
 
     def add_goal(self, e):
         """Adiciona meta"""
@@ -1341,12 +1374,7 @@ class FinancialApp:
         monthly_saving_field = self.goal_monthly_saving.content
 
         if not all([name_field.value, total_cost_field.value, monthly_saving_field.value]):
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Preencha todos os campos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Preencha todos os campos!", "#DC2626")
             return
 
         try:
@@ -1368,19 +1396,9 @@ class FinancialApp:
 
             self.update_all_views()
 
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("🎯 Meta criada!"),
-                bgcolor="#059669"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("🎯 Meta criada!", "#059669")
         except ValueError:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Valores inválidos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Valores inválidos!", "#DC2626")
 
     def add_debt(self, e):
         """Adiciona dívida"""
@@ -1389,12 +1407,7 @@ class FinancialApp:
         monthly_field = self.debt_monthly_payment.content
 
         if not all([name_field.value, total_field.value, monthly_field.value]):
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Preencha todos os campos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Preencha todos os campos!", "#DC2626")
             return
 
         try:
@@ -1415,19 +1428,9 @@ class FinancialApp:
 
             self.update_all_views()
 
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("💳 Dívida adicionada!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("💳 Dívida adicionada!", "#DC2626")
         except ValueError:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("❌ Valores inválidos!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+            self.show_snack_bar("❌ Valores inválidos!", "#DC2626")
 
     def calculate_goal_time(self, e):
         """Calcula tempo da meta"""
@@ -1460,12 +1463,7 @@ class FinancialApp:
                     self.save_data()
                     self.update_all_views()
 
-                    self.page.snack_bar = ft.SnackBar(
-                        content=ft.Text("🗑️ Transação removida!"),
-                        bgcolor="#DC2626"
-                    )
-                    self.page.snack_bar.open = True
-                    self.page.update()
+                    self.show_snack_bar("🗑️ Transação removida!", "#DC2626")
             except Exception as ex:
                 print(f"Erro ao remover despesa: {ex}")
 
@@ -1571,12 +1569,7 @@ class FinancialApp:
                             self.save_data()
                             self.update_all_views()
 
-                            self.page.snack_bar = ft.SnackBar(
-                                content=ft.Text("🗑️ Meta removida!"),
-                                bgcolor="#DC2626"
-                            )
-                            self.page.snack_bar.open = True
-                            self.page.update()
+                            self.show_snack_bar("🗑️ Meta removida!", "#DC2626")
                     except Exception as ex:
                         print(f"Erro ao remover meta: {ex}")
 
@@ -1673,12 +1666,7 @@ class FinancialApp:
                             self.save_data()
                             self.update_all_views()
 
-                            self.page.snack_bar = ft.SnackBar(
-                                content=ft.Text("🗑️ Dívida removida!"),
-                                bgcolor="#DC2626"
-                            )
-                            self.page.snack_bar.open = True
-                            self.page.update()
+                            self.show_snack_bar("🗑️ Dívida removida!", "#DC2626")
                     except Exception as ex:
                         print(f"Erro ao remover dívida: {ex}")
 
