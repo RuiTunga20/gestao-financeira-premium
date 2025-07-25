@@ -9,11 +9,13 @@ class FinancialApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.dialog_open = False  # Controle manual de diálogo
+        self.current_dialog = None  # Referência ao diálogo atual
+        self.current_view_index = 0  # Para controlar a view atual
         self.setup_page()
         self.load_data()
         self.check_new_month()
         self.create_components()
-        self.setup_navigation()
+        self.setup_layout()
 
     def setup_page(self):
         """Configuração inicial da página com design premium e mobile-first"""
@@ -25,7 +27,6 @@ class FinancialApp:
         self.page.window.width = 400
         self.page.window.height = 800
         self.page.window.resizable = True
-        self.page.scroll = ft.ScrollMode.AUTO
 
     def load_data(self):
         """Carrega dados do client_storage"""
@@ -112,6 +113,25 @@ class FinancialApp:
 
         return most_common, highest_spending[1], highest_spending[0], top_expenses
 
+    def categorize_transactions(self):
+        """Categoriza transações por tipo"""
+        regular_expenses = []
+        goal_payments = []
+        debt_payments = []
+        extra_income = []
+
+        for expense in self.expenses:
+            if expense['amount'] < 0:  # Renda extra
+                extra_income.append(expense)
+            elif expense['description'].startswith("💰 Meta:"):
+                goal_payments.append(expense)
+            elif expense['description'].startswith("💳 Dívida:"):
+                debt_payments.append(expense)
+            else:
+                regular_expenses.append(expense)
+
+        return regular_expenses, goal_payments, debt_payments, extra_income
+
     def create_mobile_card(self, content, color="#FFFFFF"):
         """Cria card otimizado para mobile"""
         return ft.Container(
@@ -149,6 +169,35 @@ class FinancialApp:
             )
         )
 
+    def create_fixed_header(self):
+        """Cria cabeçalho fixo"""
+        headers = [
+            "💳 Controle Financeiro",
+            "🎯 Metas & Objetivos",
+            "💰 Extras & Dívidas",
+            "📊 Dashboard"
+        ]
+
+        return ft.Container(
+            content=ft.Row([
+                ft.Text(
+                    headers[self.current_view_index],
+                    size=20,
+                    weight=ft.FontWeight.BOLD,
+                    color="#1F2937"
+                )
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            bgcolor="#FFFFFF",
+            padding=ft.padding.symmetric(vertical=16, horizontal=20),
+            border=ft.border.only(bottom=ft.BorderSide(1, "#E5E7EB")),
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=4,
+                color="#1F293720",
+                offset=ft.Offset(0, 2)
+            )
+        )
+
     def save_salary(self, e):
         """Salva o salário base digitado"""
         try:
@@ -177,14 +226,8 @@ class FinancialApp:
         """Cria todos os componentes da interface"""
         self.create_finances_view()
         self.create_goals_view()
-        self.create_extras_view()  # Nova aba combinada
+        self.create_extras_view()
         self.create_summary_view()
-
-        self.main_container = ft.Container(
-            content=self.finances_view,
-            expand=True,
-            padding=ft.padding.all(12)
-        )
 
     def create_finances_view(self):
         """Cria a vista de finanças otimizada para mobile"""
@@ -272,7 +315,7 @@ class FinancialApp:
             ])
         )
 
-        # Análise de gastos - ADICIONADO DE VOLTA
+        # Análise de gastos
         most_common, highest_amount, highest_desc, top_expenses = self.analyze_spending_patterns()
 
         spending_analysis = self.create_mobile_card(
@@ -363,15 +406,11 @@ class FinancialApp:
 
         # Layout mobile
         self.finances_view = ft.Column([
-            ft.Text("💳 Controle Financeiro", size=24, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ft.Container(height=16),
-
             self.salary_field,
             self.create_mobile_button("💾 Salvar Salário", self.save_salary, ft.Icons.SAVE, "#2563EB"),
 
             self.summary_card,
-
-            spending_analysis,  # ADICIONADO DE VOLTA
+            spending_analysis,
 
             ft.Text("💸 Nova Despesa", size=18, weight=ft.FontWeight.BOLD, color="#EC4899"),
             self.expense_description,
@@ -447,9 +486,6 @@ class FinancialApp:
         self.update_goals_list()
 
         self.goals_view = ft.Column([
-            ft.Text("🎯 Metas & Objetivos", size=24, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ft.Container(height=16),
-
             self.create_mobile_card(
                 ft.Column([
                     ft.Text("💰 Saldo Disponível", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
@@ -552,9 +588,6 @@ class FinancialApp:
         self.update_debts_list()
 
         self.extras_view = ft.Column([
-            ft.Text("💰 Extras & Dívidas", size=24, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ft.Container(height=16),
-
             # SEÇÃO RENDA EXTRA
             ft.Text("💰 Renda Extra", size=18, weight=ft.FontWeight.BOLD, color="#059669"),
             ft.Text("Freelances, vendas, bonificações, etc.", size=12, color="#6B7280"),
@@ -578,9 +611,9 @@ class FinancialApp:
         ], scroll=ft.ScrollMode.AUTO, spacing=0)
 
     def create_summary_view(self):
-        """Cria a vista de resumo otimizada para mobile"""
+        """Cria a vista de resumo otimizada para mobile com categorias"""
         total_spent, current_balance = self.calculate_totals()
-        most_common, highest_amount, highest_desc, top_expenses = self.analyze_spending_patterns()
+        regular_expenses, goal_payments, debt_payments, extra_income = self.categorize_transactions()
 
         # Cards estatísticas mobile
         stats_cards = ft.Column([
@@ -598,32 +631,67 @@ class FinancialApp:
             ])
         ])
 
-        # Top gastos mobile
-        top_expenses_card = self.create_mobile_card(
-            ft.Column([
-                ft.Text("🔥 Maiores Gastos", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
-                ft.Container(height=8),
+        # Função para criar lista de transações
+        def create_transaction_list(transactions, title, icon, color, max_items=3):
+            if not transactions:
+                return ft.Container()
+
+            sorted_transactions = sorted(transactions, key=lambda x: x['amount'], reverse=True)[:max_items]
+
+            return self.create_mobile_card(
                 ft.Column([
-                    ft.Row([
-                        ft.Text(f"{i + 1}.", size=12, color="#6B7280", weight=ft.FontWeight.BOLD),
-                        ft.Column([
-                            ft.Text(expense['description'][:25] + "..." if len(expense['description']) > 25
-                                    else expense['description'], size=13, weight=ft.FontWeight.BOLD),
-                            ft.Text(expense['date'], size=11, color="#6B7280")
-                        ], expand=True, spacing=2),
-                        ft.Text(f"{expense['amount']:,.0f} Kz", size=13, weight=ft.FontWeight.BOLD, color="#DC2626")
-                    ]) for i, expense in enumerate(top_expenses[:3])
-                ], spacing=8) if top_expenses else [ft.Text("Nenhuma despesa", size=12, color="#6B7280")]
-            ])
-        ) if self.expenses else ft.Container()
+                    ft.Text(f"{icon} {title}", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                    ft.Container(height=8),
+                    ft.Column([
+                        ft.Row([
+                            ft.Text(f"{i + 1}.", size=12, color="#6B7280", weight=ft.FontWeight.BOLD),
+                            ft.Column([
+                                ft.Text(transaction['description'][:25] + "..." if len(transaction['description']) > 25
+                                        else transaction['description'], size=13, weight=ft.FontWeight.BOLD),
+                                ft.Text(transaction['date'], size=11, color="#6B7280")
+                            ], expand=True, spacing=2),
+                            ft.Text(f"{abs(transaction['amount']):,.0f} Kz", size=13, weight=ft.FontWeight.BOLD,
+                                    color=color)
+                        ]) for i, transaction in enumerate(sorted_transactions)
+                    ], spacing=8),
+                    ft.Container(height=8),
+                    ft.Text(
+                        f"Total: {sum(abs(t['amount']) for t in transactions):,.0f} Kz • {len(transactions)} transações",
+                        size=11, color="#6B7280", weight=ft.FontWeight.BOLD)
+                ])
+            )
+
+        # Cards de transações categorizadas
+        transaction_cards = []
+
+        # Despesas regulares
+        if regular_expenses:
+            transaction_cards.append(
+                create_transaction_list(regular_expenses, "Despesas Regulares", "🛒", "#EC4899")
+            )
+
+        # Pagamentos de metas
+        if goal_payments:
+            transaction_cards.append(
+                create_transaction_list(goal_payments, "Investimentos em Metas", "🎯", "#059669")
+            )
+
+        # Pagamentos de dívidas
+        if debt_payments:
+            transaction_cards.append(
+                create_transaction_list(debt_payments, "Pagamentos de Dívidas", "💳", "#DC2626")
+            )
+
+        # Renda extra
+        if extra_income:
+            transaction_cards.append(
+                create_transaction_list(extra_income, "Renda Extra", "💰", "#059669")
+            )
 
         self.summary_view = ft.Column([
-            ft.Text("📊 Dashboard", size=24, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            ft.Container(height=16),
-
             stats_cards,
             ft.Container(height=16),
-            top_expenses_card
+            *transaction_cards
 
         ], scroll=ft.ScrollMode.AUTO, spacing=0)
 
@@ -649,8 +717,19 @@ class FinancialApp:
             )
         )
 
-    def setup_navigation(self):
-        """Configura a navegação mobile"""
+    def setup_layout(self):
+        """Configura o layout com header fixo, conteúdo scrollable e navegação fixa"""
+        # Header fixo
+        self.header = self.create_fixed_header()
+
+        # Container do conteúdo scrollable
+        self.content_container = ft.Container(
+            content=self.finances_view,
+            expand=True,
+            padding=ft.padding.all(12)
+        )
+
+        # Navegação fixa
         self.navigation_bar = ft.NavigationBar(
             destinations=[
                 ft.NavigationBarDestination(icon=ft.Icons.CREDIT_CARD_OUTLINED, label="Finanças",
@@ -670,20 +749,59 @@ class FinancialApp:
             height=60
         )
 
+        # Layout principal com header fixo, conteúdo e navegação fixa
         self.page.add(
             ft.Column([
-                self.main_container,
-                self.navigation_bar
+                self.header,  # Header fixo no topo
+                self.content_container,  # Conteúdo scrollable no meio
+                self.navigation_bar  # Navegação fixa no fundo
             ], expand=True, spacing=0)
         )
 
+    def close_all_dialogs(self):
+        """Fecha todos os diálogos - VERSÃO OTIMIZADA PARA FLET 0.27.5"""
+        try:
+            print("Fechando diálogos...")
+
+            # Se temos uma referência ao diálogo atual, fecha especificamente ele
+            if self.current_dialog:
+                self.current_dialog.open = False
+                if self.current_dialog in self.page.overlay:
+                    self.page.overlay.remove(self.current_dialog)
+                self.current_dialog = None
+
+            # Fecha qualquer outro diálogo que possa estar aberto
+            overlays_to_remove = []
+            for overlay in self.page.overlay:
+                if isinstance(overlay, ft.AlertDialog):
+                    overlay.open = False
+                    overlays_to_remove.append(overlay)
+
+            # Remove overlays identificados
+            for overlay in overlays_to_remove:
+                if overlay in self.page.overlay:
+                    self.page.overlay.remove(overlay)
+
+            # Reset do controle manual
+            self.dialog_open = False
+
+            # Uma única atualização
+            self.page.update()
+
+            print("Diálogos fechados com sucesso!")
+
+        except Exception as e:
+            print(f"Erro ao fechar diálogos: {e}")
+            self.dialog_open = False
+            self.current_dialog = None
+
     def show_add_payment_dialog(self, goal_index):
-        """Diálogo para adicionar pagamento à meta - UNIVERSAL PARA FLET 0.27.5"""
+        """Diálogo para adicionar pagamento à meta - COMPATÍVEL COM FLET 0.27.5"""
         print(f"Abrindo diálogo para meta {goal_index}")
 
         # Evita múltiplas chamadas usando controle manual
         if self.dialog_open:
-            print("Diálogo já está aberto (controle manual)")
+            print("Diálogo já está aberto")
             return
 
         self.dialog_open = True
@@ -746,8 +864,8 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha diálogo
-                close_dialog_action(None)
+                # Fecha diálogo simples
+                self.close_all_dialogs()
 
                 # Atualiza views
                 self.update_all_views()
@@ -774,15 +892,9 @@ class FinancialApp:
 
         def close_dialog_action(e):
             print("Fechando diálogo")
-            self.dialog_open = False  # Libera controle manual
-            # Remove diálogo do overlay
-            for overlay in list(self.page.overlay):
-                if isinstance(overlay, ft.AlertDialog):
-                    overlay.open = False
-                    self.page.overlay.remove(overlay)
-            self.page.update()
+            self.close_all_dialogs()
 
-        # Cria diálogo usando overlay (universal)
+        # Cria diálogo simples e compatível
         dialog = ft.AlertDialog(
             title=ft.Text("💰 Investir na Meta", size=18, weight=ft.FontWeight.BOLD),
             content=ft.Column([
@@ -801,19 +913,20 @@ class FinancialApp:
             ]
         )
 
-        # Adiciona ao overlay (funciona em todas as versões)
+        # Salva referência e adiciona ao overlay
+        self.current_dialog = dialog
         self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
         print(f"Diálogo aberto para meta {goal_index}")
 
     def show_pay_debt_dialog(self, debt_index):
-        """Diálogo para pagar dívida - UNIVERSAL PARA FLET 0.27.5"""
+        """Diálogo para pagar dívida - COMPATÍVEL COM FLET 0.27.5"""
         print(f"Abrindo diálogo para dívida {debt_index}")
 
         # Evita múltiplas chamadas usando controle manual
         if self.dialog_open:
-            print("Diálogo já está aberto (controle manual)")
+            print("Diálogo já está aberto")
             return
 
         self.dialog_open = True
@@ -876,8 +989,8 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha diálogo
-                close_dialog_action(None)
+                # Fecha diálogo simples
+                self.close_all_dialogs()
 
                 # Atualiza views
                 self.update_all_views()
@@ -904,15 +1017,9 @@ class FinancialApp:
 
         def close_dialog_action(e):
             print("Fechando diálogo de dívida")
-            self.dialog_open = False  # Libera controle manual
-            # Remove diálogo do overlay
-            for overlay in list(self.page.overlay):
-                if isinstance(overlay, ft.AlertDialog):
-                    overlay.open = False
-                    self.page.overlay.remove(overlay)
-            self.page.update()
+            self.close_all_dialogs()
 
-        # Cria diálogo usando overlay (universal)
+        # Cria diálogo simples e compatível
         dialog = ft.AlertDialog(
             title=ft.Text("💳 Pagar Dívida", size=18, weight=ft.FontWeight.BOLD),
             content=ft.Column([
@@ -930,27 +1037,39 @@ class FinancialApp:
             ]
         )
 
-        # Adiciona ao overlay (funciona em todas as versões)
+        # Salva referência e adiciona ao overlay
+        self.current_dialog = dialog
         self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
         print(f"Diálogo aberto para dívida {debt_index}")
 
     def navigation_changed(self, e):
-        """Gerencia navegação"""
+        """Gerencia navegação e atualiza header"""
         selected_index = e.control.selected_index
+        self.current_view_index = selected_index
+
+        # Atualiza header
+        self.header.content = ft.Row([
+            ft.Text(
+                ["💳 Controle Financeiro", "🎯 Metas & Objetivos", "💰 Extras & Dívidas", "📊 Dashboard"][selected_index],
+                size=20,
+                weight=ft.FontWeight.BOLD,
+                color="#1F2937"
+            )
+        ], alignment=ft.MainAxisAlignment.CENTER)
 
         if selected_index == 0:
-            self.main_container.content = self.finances_view
+            self.content_container.content = self.finances_view
             self.update_finances_view()
         elif selected_index == 1:
-            self.main_container.content = self.goals_view
+            self.content_container.content = self.goals_view
             self.update_goals_view()
         elif selected_index == 2:
-            self.main_container.content = self.extras_view
+            self.content_container.content = self.extras_view
             self.update_extras_view()
         elif selected_index == 3:
-            self.main_container.content = self.summary_view
+            self.content_container.content = self.summary_view
             self.update_summary_view()
 
         self.page.update()
@@ -1483,42 +1602,40 @@ class FinancialApp:
     def update_finances_view(self):
         """Atualiza vista de finanças"""
         self.create_finances_view()
-        if hasattr(self, 'main_container') and hasattr(self, 'finances_view'):
-            if self.navigation_bar.selected_index == 0:
-                self.main_container.content = self.finances_view
+        if hasattr(self, 'content_container') and hasattr(self, 'finances_view'):
+            if self.current_view_index == 0:
+                self.content_container.content = self.finances_view
 
     def update_goals_view(self):
         """Atualiza vista de metas"""
         self.create_goals_view()
-        if hasattr(self, 'main_container') and hasattr(self, 'goals_view'):
-            if self.navigation_bar.selected_index == 1:
-                self.main_container.content = self.goals_view
+        if hasattr(self, 'content_container') and hasattr(self, 'goals_view'):
+            if self.current_view_index == 1:
+                self.content_container.content = self.goals_view
 
     def update_extras_view(self):
         """Atualiza vista de extras"""
         self.create_extras_view()
-        if hasattr(self, 'main_container') and hasattr(self, 'extras_view'):
-            if self.navigation_bar.selected_index == 2:
-                self.main_container.content = self.extras_view
+        if hasattr(self, 'content_container') and hasattr(self, 'extras_view'):
+            if self.current_view_index == 2:
+                self.content_container.content = self.extras_view
 
     def update_summary_view(self):
         """Atualiza vista de resumo"""
         self.create_summary_view()
-        if hasattr(self, 'main_container') and hasattr(self, 'summary_view'):
-            if self.navigation_bar.selected_index == 3:
-                self.main_container.content = self.summary_view
+        if hasattr(self, 'content_container') and hasattr(self, 'summary_view'):
+            if self.current_view_index == 3:
+                self.content_container.content = self.summary_view
 
     def update_all_views(self):
         """Atualiza todas as vistas"""
-        current_index = getattr(self.navigation_bar, 'selected_index', 0)
-
-        if current_index == 0:
+        if self.current_view_index == 0:
             self.update_finances_view()
-        elif current_index == 1:
+        elif self.current_view_index == 1:
             self.update_goals_view()
-        elif current_index == 2:
+        elif self.current_view_index == 2:
             self.update_extras_view()
-        elif current_index == 3:
+        elif self.current_view_index == 3:
             self.update_summary_view()
 
         self.page.update()
