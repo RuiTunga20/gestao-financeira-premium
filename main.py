@@ -8,6 +8,7 @@ from collections import Counter
 class FinancialApp:
     def __init__(self, page: ft.Page):
         self.page = page
+        self.dialog_open = False  # Controle manual de diálogo
         self.setup_page()
         self.load_data()
         self.check_new_month()
@@ -677,9 +678,22 @@ class FinancialApp:
         )
 
     def show_add_payment_dialog(self, goal_index):
-        """Diálogo para adicionar pagamento à meta - CORRIGIDO"""
-        print(f"Abrindo diálogo para meta {goal_index}")  # Debug
+        """Diálogo para adicionar pagamento à meta - UNIVERSAL PARA FLET 0.27.5"""
+        print(f"Abrindo diálogo para meta {goal_index}")
+
+        # Evita múltiplas chamadas usando controle manual
+        if self.dialog_open:
+            print("Diálogo já está aberto (controle manual)")
+            return
+
+        self.dialog_open = True
         _, current_balance = self.calculate_totals()
+
+        # Verifica se a meta existe
+        if goal_index >= len(self.goals):
+            print(f"Erro: Meta {goal_index} não existe")
+            self.dialog_open = False
+            return
 
         payment_field = ft.TextField(
             label="Valor do Pagamento (Kz)",
@@ -689,21 +703,22 @@ class FinancialApp:
             focused_border_color="#059669",
             border_radius=12,
             content_padding=ft.padding.all(16),
-            text_size=14
+            text_size=14,
+            autofocus=True
         )
 
         error_text = ft.Text("", size=12)
 
         def add_payment_action(e):
-            print(f"Tentando adicionar pagamento à meta {goal_index}")  # Debug
+            print(f"Processando pagamento para meta {goal_index}")
             try:
-                if not payment_field.value:
+                if not payment_field.value or payment_field.value.strip() == "":
                     error_text.value = "❌ Digite um valor!"
                     error_text.color = "#DC2626"
                     self.page.update()
                     return
 
-                amount = float(payment_field.value)
+                amount = float(payment_field.value.strip())
                 if amount <= 0:
                     error_text.value = "❌ Valor deve ser maior que zero!"
                     error_text.color = "#DC2626"
@@ -730,22 +745,25 @@ class FinancialApp:
                 self.expenses.append(payment_expense)
 
                 self.save_data()
-                self.update_all_views()
 
                 # Fecha diálogo
-                self.page.dialog.open = False
-                self.page.update()
+                close_dialog_action(None)
+
+                # Atualiza views
+                self.update_all_views()
 
                 # Mostra sucesso
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("💰 Pagamento realizado!"),
+                    content=ft.Text("💰 Investimento realizado com sucesso!"),
                     bgcolor="#059669"
                 )
                 self.page.snack_bar.open = True
                 self.page.update()
 
+                print(f"Pagamento de {amount} realizado com sucesso para meta {goal_index}")
+
             except ValueError:
-                error_text.value = "❌ Valor inválido!"
+                error_text.value = "❌ Valor inválido! Use apenas números."
                 error_text.color = "#DC2626"
                 self.page.update()
             except Exception as ex:
@@ -755,34 +773,57 @@ class FinancialApp:
                 self.page.update()
 
         def close_dialog_action(e):
-            self.page.dialog.open = False
+            print("Fechando diálogo")
+            self.dialog_open = False  # Libera controle manual
+            # Remove diálogo do overlay
+            for overlay in list(self.page.overlay):
+                if isinstance(overlay, ft.AlertDialog):
+                    overlay.open = False
+                    self.page.overlay.remove(overlay)
             self.page.update()
 
+        # Cria diálogo usando overlay (universal)
         dialog = ft.AlertDialog(
             title=ft.Text("💰 Investir na Meta", size=18, weight=ft.FontWeight.BOLD),
             content=ft.Column([
                 ft.Text(f"Meta: {self.goals[goal_index]['name']}", size=14, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Custo: {self.goals[goal_index]['total_cost']:,.0f} Kz", size=12, color="#6B7280"),
-                ft.Text(f"Já pago: {self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=12, color="#059669"),
-                ft.Text(f"Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
+                ft.Text(f"Custo Total: {self.goals[goal_index]['total_cost']:,.0f} Kz", size=12, color="#6B7280"),
+                ft.Text(f"Já Investido: {self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=12,
+                        color="#059669"),
+                ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
                 ft.Container(height=12),
                 payment_field,
                 error_text
             ], tight=True, spacing=8),
             actions=[
                 ft.TextButton("Cancelar", on_click=close_dialog_action),
-                ft.ElevatedButton("Investir", on_click=add_payment_action, bgcolor="#059669", color="#FFFFFF")
+                ft.ElevatedButton("💰 Investir", on_click=add_payment_action, bgcolor="#059669", color="#FFFFFF")
             ]
         )
 
-        self.page.dialog = dialog
+        # Adiciona ao overlay (funciona em todas as versões)
+        self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
+        print(f"Diálogo aberto para meta {goal_index}")
 
     def show_pay_debt_dialog(self, debt_index):
-        """Diálogo para pagar dívida - CORRIGIDO"""
-        print(f"Abrindo diálogo para dívida {debt_index}")  # Debug
+        """Diálogo para pagar dívida - UNIVERSAL PARA FLET 0.27.5"""
+        print(f"Abrindo diálogo para dívida {debt_index}")
+
+        # Evita múltiplas chamadas usando controle manual
+        if self.dialog_open:
+            print("Diálogo já está aberto (controle manual)")
+            return
+
+        self.dialog_open = True
         _, current_balance = self.calculate_totals()
+
+        # Verifica se a dívida existe
+        if debt_index >= len(self.debts):
+            print(f"Erro: Dívida {debt_index} não existe")
+            self.dialog_open = False
+            return
 
         payment_field = ft.TextField(
             label="Valor do Pagamento (Kz)",
@@ -792,21 +833,22 @@ class FinancialApp:
             focused_border_color="#DC2626",
             border_radius=12,
             content_padding=ft.padding.all(16),
-            text_size=14
+            text_size=14,
+            autofocus=True
         )
 
         error_text = ft.Text("", size=12)
 
         def pay_debt_action(e):
-            print(f"Tentando pagar dívida {debt_index}")  # Debug
+            print(f"Processando pagamento para dívida {debt_index}")
             try:
-                if not payment_field.value:
+                if not payment_field.value or payment_field.value.strip() == "":
                     error_text.value = "❌ Digite um valor!"
                     error_text.color = "#DC2626"
                     self.page.update()
                     return
 
-                amount = float(payment_field.value)
+                amount = float(payment_field.value.strip())
                 if amount <= 0:
                     error_text.value = "❌ Valor deve ser maior que zero!"
                     error_text.color = "#DC2626"
@@ -833,22 +875,25 @@ class FinancialApp:
                 self.expenses.append(debt_expense)
 
                 self.save_data()
-                self.update_all_views()
 
                 # Fecha diálogo
-                self.page.dialog.open = False
-                self.page.update()
+                close_dialog_action(None)
+
+                # Atualiza views
+                self.update_all_views()
 
                 # Mostra sucesso
                 self.page.snack_bar = ft.SnackBar(
-                    content=ft.Text("💳 Pagamento realizado!"),
+                    content=ft.Text("💳 Pagamento realizado com sucesso!"),
                     bgcolor="#DC2626"
                 )
                 self.page.snack_bar.open = True
                 self.page.update()
 
+                print(f"Pagamento de {amount} realizado com sucesso para dívida {debt_index}")
+
             except ValueError:
-                error_text.value = "❌ Valor inválido!"
+                error_text.value = "❌ Valor inválido! Use apenas números."
                 error_text.color = "#DC2626"
                 self.page.update()
             except Exception as ex:
@@ -858,29 +903,38 @@ class FinancialApp:
                 self.page.update()
 
         def close_dialog_action(e):
-            self.page.dialog.open = False
+            print("Fechando diálogo de dívida")
+            self.dialog_open = False  # Libera controle manual
+            # Remove diálogo do overlay
+            for overlay in list(self.page.overlay):
+                if isinstance(overlay, ft.AlertDialog):
+                    overlay.open = False
+                    self.page.overlay.remove(overlay)
             self.page.update()
 
+        # Cria diálogo usando overlay (universal)
         dialog = ft.AlertDialog(
             title=ft.Text("💳 Pagar Dívida", size=18, weight=ft.FontWeight.BOLD),
             content=ft.Column([
                 ft.Text(f"Dívida: {self.debts[debt_index]['name']}", size=14, weight=ft.FontWeight.BOLD),
                 ft.Text(f"Total: {self.debts[debt_index]['total_amount']:,.0f} Kz", size=12, color="#6B7280"),
-                ft.Text(f"Já pago: {self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=12, color="#DC2626"),
-                ft.Text(f"Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
+                ft.Text(f"Já Pago: {self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=12, color="#DC2626"),
+                ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
                 ft.Container(height=12),
                 payment_field,
                 error_text
             ], tight=True, spacing=8),
             actions=[
                 ft.TextButton("Cancelar", on_click=close_dialog_action),
-                ft.ElevatedButton("Pagar", on_click=pay_debt_action, bgcolor="#DC2626", color="#FFFFFF")
+                ft.ElevatedButton("💳 Pagar", on_click=pay_debt_action, bgcolor="#DC2626", color="#FFFFFF")
             ]
         )
 
-        self.page.dialog = dialog
+        # Adiciona ao overlay (funciona em todas as versões)
+        self.page.overlay.append(dialog)
         dialog.open = True
         self.page.update()
+        print(f"Diálogo aberto para dívida {debt_index}")
 
     def navigation_changed(self, e):
         """Gerencia navegação"""
@@ -1113,50 +1167,20 @@ class FinancialApp:
         """Remove despesa"""
 
         def remove(e):
-            self.expenses.pop(index)
-            self.save_data()
-            self.update_all_views()
+            try:
+                if index < len(self.expenses):
+                    self.expenses.pop(index)
+                    self.save_data()
+                    self.update_all_views()
 
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("🗑️ Removido!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-
-        return remove
-
-    def remove_goal(self, index):
-        """Remove meta"""
-
-        def remove(e):
-            self.goals.pop(index)
-            self.save_data()
-            self.update_all_views()
-
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("🗑️ Meta removida!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-
-        return remove
-
-    def remove_debt(self, index):
-        """Remove dívida"""
-
-        def remove(e):
-            self.debts.pop(index)
-            self.save_data()
-            self.update_all_views()
-
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("🗑️ Dívida removida!"),
-                bgcolor="#DC2626"
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
+                    self.page.snack_bar = ft.SnackBar(
+                        content=ft.Text("🗑️ Transação removida!"),
+                        bgcolor="#DC2626"
+                    )
+                    self.page.snack_bar.open = True
+                    self.page.update()
+            except Exception as ex:
+                print(f"Erro ao remover despesa: {ex}")
 
         return remove
 
@@ -1221,7 +1245,7 @@ class FinancialApp:
             self.expenses_list.controls.append(expense_item)
 
     def update_goals_list(self):
-        """Atualiza lista de metas - CORRIGIDO"""
+        """Atualiza lista de metas - CORRIGIDO COM HANDLER ROBUSTO"""
         self.goals_list.controls.clear()
 
         for i, goal in enumerate(self.goals):
@@ -1243,19 +1267,64 @@ class FinancialApp:
                 status_color = "#6B7280"
                 can_invest = True
 
-            # CORRIGIDO: Usar closure para capturar o índice correto
-            invest_button = ft.Container(
-                content=ft.Text("💰 Investir", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
-                bgcolor="#ECFDF5" if can_invest else "#F3F4F6",
-                border_radius=6,
-                padding=ft.padding.symmetric(horizontal=12, vertical=6),
-                on_click=lambda e, idx=i: self.show_add_payment_dialog(idx) if can_invest else None
-            ) if can_invest else ft.Container(
-                content=ft.Text("✅ Completa", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
-                bgcolor="#ECFDF5",
-                border_radius=6,
-                padding=ft.padding.symmetric(horizontal=12, vertical=6)
-            )
+            # Função para criar handler de clique seguro
+            def create_invest_click_handler(goal_index):
+                def handle_invest_click(e):
+                    print(f"Clique no botão investir para meta {goal_index}")
+                    try:
+                        # Evita múltiplas chamadas usando controle manual
+                        if self.dialog_open:
+                            print("Já existe um diálogo aberto (controle manual)")
+                            return
+                        self.show_add_payment_dialog(goal_index)
+                    except Exception as ex:
+                        print(f"Erro no handler de investir: {ex}")
+                        self.page.snack_bar = ft.SnackBar(
+                            content=ft.Text(f"❌ Erro: {str(ex)}"),
+                            bgcolor="#DC2626"
+                        )
+                        self.page.snack_bar.open = True
+                        self.page.update()
+
+                return handle_invest_click
+
+            # Função para criar handler de remoção seguro
+            def create_remove_click_handler(goal_index):
+                def handle_remove_click(e):
+                    try:
+                        if goal_index < len(self.goals):
+                            self.goals.pop(goal_index)
+                            self.save_data()
+                            self.update_all_views()
+
+                            self.page.snack_bar = ft.SnackBar(
+                                content=ft.Text("🗑️ Meta removida!"),
+                                bgcolor="#DC2626"
+                            )
+                            self.page.snack_bar.open = True
+                            self.page.update()
+                    except Exception as ex:
+                        print(f"Erro ao remover meta: {ex}")
+
+                return handle_remove_click
+
+            # CORRIGIDO: Botão de investir mais robusto
+            if can_invest:
+                invest_button = ft.Container(
+                    content=ft.Text("💰 Investir", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                    bgcolor="#ECFDF5",
+                    border_radius=6,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                    on_click=create_invest_click_handler(i),
+                    ink=True  # Adiciona efeito visual de clique
+                )
+            else:
+                invest_button = ft.Container(
+                    content=ft.Text("✅ Completa", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                    bgcolor="#ECFDF5",
+                    border_radius=6,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=6)
+                )
 
             goal_card = ft.Container(
                 content=ft.Column([
@@ -1268,8 +1337,8 @@ class FinancialApp:
                             icon=ft.Icons.DELETE_OUTLINE,
                             icon_color="#DC2626",
                             icon_size=16,
-                            on_click=self.remove_goal(i),
-                            tooltip="Remover"
+                            on_click=create_remove_click_handler(i),
+                            tooltip="Remover meta"
                         )
                     ]),
                     ft.Container(height=8),
@@ -1296,7 +1365,7 @@ class FinancialApp:
             self.goals_list.controls.append(goal_card)
 
     def update_debts_list(self):
-        """Atualiza lista de dívidas - CORRIGIDO"""
+        """Atualiza lista de dívidas - CORRIGIDO COM HANDLER ROBUSTO"""
         self.debts_list.controls.clear()
 
         for i, debt in enumerate(self.debts):
@@ -1314,19 +1383,64 @@ class FinancialApp:
                 status_color = "#DC2626"
                 can_pay = True
 
-            # CORRIGIDO: Usar closure para capturar o índice correto
-            pay_button = ft.Container(
-                content=ft.Text("💳 Pagar", size=12, weight=ft.FontWeight.BOLD, color="#DC2626"),
-                bgcolor="#FEF2F2" if can_pay else "#F3F4F6",
-                border_radius=6,
-                padding=ft.padding.symmetric(horizontal=12, vertical=6),
-                on_click=lambda e, idx=i: self.show_pay_debt_dialog(idx) if can_pay else None
-            ) if can_pay else ft.Container(
-                content=ft.Text("✅ Quitada", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
-                bgcolor="#ECFDF5",
-                border_radius=6,
-                padding=ft.padding.symmetric(horizontal=12, vertical=6)
-            )
+            # Função para criar handler de clique seguro
+            def create_pay_click_handler(debt_index):
+                def handle_pay_click(e):
+                    print(f"Clique no botão pagar para dívida {debt_index}")
+                    try:
+                        # Evita múltiplas chamadas usando controle manual
+                        if self.dialog_open:
+                            print("Já existe um diálogo aberto (controle manual)")
+                            return
+                        self.show_pay_debt_dialog(debt_index)
+                    except Exception as ex:
+                        print(f"Erro no handler de pagar: {ex}")
+                        self.page.snack_bar = ft.SnackBar(
+                            content=ft.Text(f"❌ Erro: {str(ex)}"),
+                            bgcolor="#DC2626"
+                        )
+                        self.page.snack_bar.open = True
+                        self.page.update()
+
+                return handle_pay_click
+
+            # Função para criar handler de remoção seguro
+            def create_remove_click_handler(debt_index):
+                def handle_remove_click(e):
+                    try:
+                        if debt_index < len(self.debts):
+                            self.debts.pop(debt_index)
+                            self.save_data()
+                            self.update_all_views()
+
+                            self.page.snack_bar = ft.SnackBar(
+                                content=ft.Text("🗑️ Dívida removida!"),
+                                bgcolor="#DC2626"
+                            )
+                            self.page.snack_bar.open = True
+                            self.page.update()
+                    except Exception as ex:
+                        print(f"Erro ao remover dívida: {ex}")
+
+                return handle_remove_click
+
+            # CORRIGIDO: Botão de pagamento mais robusto
+            if can_pay:
+                pay_button = ft.Container(
+                    content=ft.Text("💳 Pagar", size=12, weight=ft.FontWeight.BOLD, color="#DC2626"),
+                    bgcolor="#FEF2F2",
+                    border_radius=6,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                    on_click=create_pay_click_handler(i),
+                    ink=True  # Adiciona efeito visual de clique
+                )
+            else:
+                pay_button = ft.Container(
+                    content=ft.Text("✅ Quitada", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                    bgcolor="#ECFDF5",
+                    border_radius=6,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=6)
+                )
 
             debt_card = ft.Container(
                 content=ft.Column([
@@ -1339,8 +1453,8 @@ class FinancialApp:
                             icon=ft.Icons.DELETE_OUTLINE,
                             icon_color="#DC2626",
                             icon_size=16,
-                            on_click=self.remove_debt(i),
-                            tooltip="Remover"
+                            on_click=create_remove_click_handler(i),
+                            tooltip="Remover dívida"
                         )
                     ]),
                     ft.Container(height=8),
