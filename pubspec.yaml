@@ -1,5 +1,5 @@
-name: gestao_financeira_premium
-description: Aplicação de Gestão Financeira Premium
+name: Gastei
+description: Aplicação de Gestão Financeira
 version: 1.0.0+1
 publish_to: 'none'
 
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flet: ^0.27.5
+  flet: ^0.25.0
 
 dev_dependencies:
   flutter_test:

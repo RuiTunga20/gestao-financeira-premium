@@ -9,7 +9,6 @@ class FinancialApp:
     def __init__(self, page: ft.Page):
         self.page = page
         self.dialog_open = False  # Controle manual de diálogo
-        self.current_dialog = None  # Referência ao diálogo atual
         self.current_view_index = 0  # Para controlar a view atual
         self.setup_page()
         self.load_data()
@@ -759,33 +758,24 @@ class FinancialApp:
         )
 
     def close_all_dialogs(self):
-        """Fecha todos os diálogos - VERSÃO OTIMIZADA PARA FLET 0.27.5"""
+        """Fecha todos os diálogos e bottom sheets"""
         try:
             print("Fechando diálogos...")
 
-            # Se temos uma referência ao diálogo atual, fecha especificamente ele
-            if self.current_dialog:
-                self.current_dialog.open = False
-                if self.current_dialog in self.page.overlay:
-                    self.page.overlay.remove(self.current_dialog)
-                self.current_dialog = None
+            # Fecha page.dialog
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                self.page.dialog.open = False
+                self.page.dialog = None
 
-            # Fecha qualquer outro diálogo que possa estar aberto
-            overlays_to_remove = []
-            for overlay in self.page.overlay:
-                if isinstance(overlay, ft.AlertDialog):
-                    overlay.open = False
-                    overlays_to_remove.append(overlay)
-
-            # Remove overlays identificados
-            for overlay in overlays_to_remove:
-                if overlay in self.page.overlay:
-                    self.page.overlay.remove(overlay)
+            # Fecha bottom sheet
+            if hasattr(self.page, 'bottom_sheet') and self.page.bottom_sheet:
+                self.page.bottom_sheet.open = False
+                self.page.bottom_sheet = None
 
             # Reset do controle manual
             self.dialog_open = False
 
-            # Uma única atualização
+            # Atualização única
             self.page.update()
 
             print("Diálogos fechados com sucesso!")
@@ -793,11 +783,10 @@ class FinancialApp:
         except Exception as e:
             print(f"Erro ao fechar diálogos: {e}")
             self.dialog_open = False
-            self.current_dialog = None
 
     def show_add_payment_dialog(self, goal_index):
-        """Diálogo para adicionar pagamento à meta - COMPATÍVEL COM FLET 0.27.5"""
-        print(f"Abrindo diálogo para meta {goal_index}")
+        """BottomSheet para adicionar pagamento à meta - SEM SOMBRAS!"""
+        print(f"Abrindo bottom sheet para meta {goal_index}")
 
         # Evita múltiplas chamadas usando controle manual
         if self.dialog_open:
@@ -864,7 +853,7 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha diálogo simples
+                # Fecha bottom sheet
                 self.close_all_dialogs()
 
                 # Atualiza views
@@ -890,39 +879,86 @@ class FinancialApp:
                 error_text.color = "#DC2626"
                 self.page.update()
 
-        def close_dialog_action(e):
-            print("Fechando diálogo")
+        def close_sheet_action(e):
+            print("Fechando bottom sheet")
             self.close_all_dialogs()
 
-        # Cria diálogo simples e compatível
-        dialog = ft.AlertDialog(
-            title=ft.Text("💰 Investir na Meta", size=18, weight=ft.FontWeight.BOLD),
-            content=ft.Column([
-                ft.Text(f"Meta: {self.goals[goal_index]['name']}", size=14, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Custo Total: {self.goals[goal_index]['total_cost']:,.0f} Kz", size=12, color="#6B7280"),
-                ft.Text(f"Já Investido: {self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=12,
-                        color="#059669"),
-                ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
-                ft.Container(height=12),
-                payment_field,
-                error_text
-            ], tight=True, spacing=8),
-            actions=[
-                ft.TextButton("Cancelar", on_click=close_dialog_action),
-                ft.ElevatedButton("💰 Investir", on_click=add_payment_action, bgcolor="#059669", color="#FFFFFF")
-            ]
+        # Cria BottomSheet (SEM SOMBRAS!)
+        bottom_sheet = ft.BottomSheet(
+            content=ft.Container(
+                content=ft.Column([
+                    # Header do bottom sheet
+                    ft.Row([
+                        ft.Text("💰 Investir na Meta", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                        ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            on_click=close_sheet_action,
+                            icon_color="#6B7280"
+                        )
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+
+                    ft.Container(height=8),
+
+                    # Informações da meta
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"Meta: {self.goals[goal_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
+                                    color="#1F2937"),
+                            ft.Text(f"Custo Total: {self.goals[goal_index]['total_cost']:,.0f} Kz", size=14,
+                                    color="#6B7280"),
+                            ft.Text(f"Já Investido: {self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=14,
+                                    color="#059669"),
+                            ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=14, color="#2563EB"),
+                        ], spacing=4),
+                        bgcolor="#F9FAFB",
+                        border_radius=12,
+                        padding=ft.padding.all(16),
+                        margin=ft.margin.only(bottom=16)
+                    ),
+
+                    # Campo de input
+                    payment_field,
+                    ft.Container(height=8),
+                    error_text,
+                    ft.Container(height=16),
+
+                    # Botões
+                    ft.Row([
+                        ft.ElevatedButton(
+                            "Cancelar",
+                            on_click=close_sheet_action,
+                            bgcolor="#F3F4F6",
+                            color="#374151",
+                            expand=1
+                        ),
+                        ft.Container(width=12),
+                        ft.ElevatedButton(
+                            "💰 Investir",
+                            on_click=add_payment_action,
+                            bgcolor="#059669",
+                            color="#FFFFFF",
+                            expand=2
+                        )
+                    ]),
+
+                    ft.Container(height=20)  # Espaço no final
+
+                ], spacing=0),
+                padding=ft.padding.all(20),
+                bgcolor="#FFFFFF",
+                border_radius=ft.border_radius.only(top_left=20, top_right=20)
+            ),
+            open=True
         )
 
-        # Salva referência e adiciona ao overlay
-        self.current_dialog = dialog
-        self.page.overlay.append(dialog)
-        dialog.open = True
+        # USA BottomSheet (SEM SOMBRAS!)
+        self.page.bottom_sheet = bottom_sheet
         self.page.update()
-        print(f"Diálogo aberto para meta {goal_index}")
+        print(f"Bottom sheet aberto para meta {goal_index}")
 
     def show_pay_debt_dialog(self, debt_index):
-        """Diálogo para pagar dívida - COMPATÍVEL COM FLET 0.27.5"""
-        print(f"Abrindo diálogo para dívida {debt_index}")
+        """BottomSheet para pagar dívida - SEM SOMBRAS!"""
+        print(f"Abrindo bottom sheet para dívida {debt_index}")
 
         # Evita múltiplas chamadas usando controle manual
         if self.dialog_open:
@@ -989,7 +1025,7 @@ class FinancialApp:
 
                 self.save_data()
 
-                # Fecha diálogo simples
+                # Fecha bottom sheet
                 self.close_all_dialogs()
 
                 # Atualiza views
@@ -1015,34 +1051,82 @@ class FinancialApp:
                 error_text.color = "#DC2626"
                 self.page.update()
 
-        def close_dialog_action(e):
-            print("Fechando diálogo de dívida")
+        def close_sheet_action(e):
+            print("Fechando bottom sheet de dívida")
             self.close_all_dialogs()
 
-        # Cria diálogo simples e compatível
-        dialog = ft.AlertDialog(
-            title=ft.Text("💳 Pagar Dívida", size=18, weight=ft.FontWeight.BOLD),
-            content=ft.Column([
-                ft.Text(f"Dívida: {self.debts[debt_index]['name']}", size=14, weight=ft.FontWeight.BOLD),
-                ft.Text(f"Total: {self.debts[debt_index]['total_amount']:,.0f} Kz", size=12, color="#6B7280"),
-                ft.Text(f"Já Pago: {self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=12, color="#DC2626"),
-                ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=12, color="#2563EB"),
-                ft.Container(height=12),
-                payment_field,
-                error_text
-            ], tight=True, spacing=8),
-            actions=[
-                ft.TextButton("Cancelar", on_click=close_dialog_action),
-                ft.ElevatedButton("💳 Pagar", on_click=pay_debt_action, bgcolor="#DC2626", color="#FFFFFF")
-            ]
+        # Cria BottomSheet (SEM SOMBRAS!)
+        bottom_sheet = ft.BottomSheet(
+            content=ft.Container(
+                content=ft.Column([
+                    # Header do bottom sheet
+                    ft.Row([
+                        ft.Text("💳 Pagar Dívida", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                        ft.IconButton(
+                            icon=ft.Icons.CLOSE,
+                            on_click=close_sheet_action,
+                            icon_color="#6B7280"
+                        )
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+
+                    ft.Container(height=8),
+
+                    # Informações da dívida
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"Dívida: {self.debts[debt_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
+                                    color="#1F2937"),
+                            ft.Text(f"Total: {self.debts[debt_index]['total_amount']:,.0f} Kz", size=14,
+                                    color="#6B7280"),
+                            ft.Text(f"Já Pago: {self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=14,
+                                    color="#DC2626"),
+                            ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=14, color="#2563EB"),
+                        ], spacing=4),
+                        bgcolor="#F9FAFB",
+                        border_radius=12,
+                        padding=ft.padding.all(16),
+                        margin=ft.margin.only(bottom=16)
+                    ),
+
+                    # Campo de input
+                    payment_field,
+                    ft.Container(height=8),
+                    error_text,
+                    ft.Container(height=16),
+
+                    # Botões
+                    ft.Row([
+                        ft.ElevatedButton(
+                            "Cancelar",
+                            on_click=close_sheet_action,
+                            bgcolor="#F3F4F6",
+                            color="#374151",
+                            expand=1
+                        ),
+                        ft.Container(width=12),
+                        ft.ElevatedButton(
+                            "💳 Pagar",
+                            on_click=pay_debt_action,
+                            bgcolor="#DC2626",
+                            color="#FFFFFF",
+                            expand=2
+                        )
+                    ]),
+
+                    ft.Container(height=20)  # Espaço no final
+
+                ], spacing=0),
+                padding=ft.padding.all(20),
+                bgcolor="#FFFFFF",
+                border_radius=ft.border_radius.only(top_left=20, top_right=20)
+            ),
+            open=True
         )
 
-        # Salva referência e adiciona ao overlay
-        self.current_dialog = dialog
-        self.page.overlay.append(dialog)
-        dialog.open = True
+        # USA BottomSheet (SEM SOMBRAS!)
+        self.page.bottom_sheet = bottom_sheet
         self.page.update()
-        print(f"Diálogo aberto para dívida {debt_index}")
+        print(f"Bottom sheet aberto para dívida {debt_index}")
 
     def navigation_changed(self, e):
         """Gerencia navegação e atualiza header"""
