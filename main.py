@@ -197,6 +197,33 @@ class FinancialApp:
             )
         )
 
+    def close_dialog(self):
+        """Fecha diálogo/bottom sheet de forma limpa"""
+        try:
+            print("Fechando diálogo...")
+
+            # Fecha bottom sheet
+            if hasattr(self.page, 'bottom_sheet') and self.page.bottom_sheet:
+                self.page.bottom_sheet.open = False
+                self.page.bottom_sheet = None
+
+            # Fecha diálogo regular (fallback)
+            if hasattr(self.page, 'dialog') and self.page.dialog:
+                self.page.dialog.open = False
+                self.page.dialog = None
+
+            # Reset do controle manual
+            self.dialog_open = False
+
+            # Atualização única
+            self.page.update()
+
+            print("Diálogo fechado com sucesso!")
+
+        except Exception as e:
+            print(f"Erro ao fechar diálogo: {e}")
+            self.dialog_open = False
+
     def save_salary(self, e):
         """Salva o salário base digitado"""
         try:
@@ -725,7 +752,7 @@ class FinancialApp:
         self.content_container = ft.Container(
             content=self.finances_view,
             expand=True,
-            padding=ft.padding.all(12)
+            padding=ft.padding.only(left=12, right=12, top=12, bottom=20)  # Padding extra no fundo
         )
 
         # Navegação fixa
@@ -741,11 +768,12 @@ class FinancialApp:
                                             selected_icon=ft.Icons.ANALYTICS)
             ],
             on_change=self.navigation_changed,
-            bgcolor="#FFFFFF",
+            bgcolor="transparent",  # Transparente para mostrar o container por trás
             indicator_color="#EFF6FF",
             selected_index=0,
             label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-            height=60
+            height=64,  # Altura ligeiramente maior
+            surface_tint_color="#FFFFFF"
         )
 
         # Layout principal com header fixo, conteúdo e navegação fixa
@@ -753,42 +781,26 @@ class FinancialApp:
             ft.Column([
                 self.header,  # Header fixo no topo
                 self.content_container,  # Conteúdo scrollable no meio
-                self.navigation_bar  # Navegação fixa no fundo
+                ft.Container(
+                    content=self.navigation_bar,
+                    margin=ft.margin.only(bottom=8),  # Espaço acima da navegação
+                    bgcolor="#FFFFFF",
+                    border_radius=ft.border_radius.only(top_left=16, top_right=16),
+                    shadow=ft.BoxShadow(
+                        spread_radius=0,
+                        blur_radius=8,
+                        color="#1F293720",
+                        offset=ft.Offset(0, -2)
+                    )
+                )  # Navegação fixa no fundo com espaçamento
             ], expand=True, spacing=0)
         )
 
-    def close_all_dialogs(self):
-        """Fecha todos os diálogos e bottom sheets"""
-        try:
-            print("Fechando diálogos...")
-
-            # Fecha page.dialog
-            if hasattr(self.page, 'dialog') and self.page.dialog:
-                self.page.dialog.open = False
-                self.page.dialog = None
-
-            # Fecha bottom sheet
-            if hasattr(self.page, 'bottom_sheet') and self.page.bottom_sheet:
-                self.page.bottom_sheet.open = False
-                self.page.bottom_sheet = None
-
-            # Reset do controle manual
-            self.dialog_open = False
-
-            # Atualização única
-            self.page.update()
-
-            print("Diálogos fechados com sucesso!")
-
-        except Exception as e:
-            print(f"Erro ao fechar diálogos: {e}")
-            self.dialog_open = False
-
     def show_add_payment_dialog(self, goal_index):
-        """BottomSheet para adicionar pagamento à meta - SEM SOMBRAS!"""
+        """BottomSheet para adicionar pagamento à meta - SE ADAPTA AO TECLADO"""
         print(f"Abrindo bottom sheet para meta {goal_index}")
 
-        # Evita múltiplas chamadas usando controle manual
+        # Evita múltiplas chamadas
         if self.dialog_open:
             print("Diálogo já está aberto")
             return
@@ -814,27 +826,24 @@ class FinancialApp:
             autofocus=True
         )
 
-        error_text = ft.Text("", size=12)
+        error_text = ft.Text("", size=12, color="#DC2626")
 
         def add_payment_action(e):
             print(f"Processando pagamento para meta {goal_index}")
             try:
                 if not payment_field.value or payment_field.value.strip() == "":
                     error_text.value = "❌ Digite um valor!"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
                 amount = float(payment_field.value.strip())
                 if amount <= 0:
                     error_text.value = "❌ Valor deve ser maior que zero!"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
                 if amount > current_balance:
                     error_text.value = f"❌ Saldo insuficiente! Disponível: {current_balance:,.0f} Kz"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
@@ -854,7 +863,7 @@ class FinancialApp:
                 self.save_data()
 
                 # Fecha bottom sheet
-                self.close_all_dialogs()
+                self.close_dialog()
 
                 # Atualiza views
                 self.update_all_views()
@@ -871,56 +880,89 @@ class FinancialApp:
 
             except ValueError:
                 error_text.value = "❌ Valor inválido! Use apenas números."
-                error_text.color = "#DC2626"
                 self.page.update()
             except Exception as ex:
                 print(f"Erro ao processar pagamento: {ex}")
                 error_text.value = f"❌ Erro: {str(ex)}"
-                error_text.color = "#DC2626"
                 self.page.update()
 
         def close_sheet_action(e):
             print("Fechando bottom sheet")
-            self.close_all_dialogs()
+            self.close_dialog()
 
-        # Cria BottomSheet (SEM SOMBRAS!)
+        # Cria BottomSheet que se adapta ao teclado
         bottom_sheet = ft.BottomSheet(
             content=ft.Container(
                 content=ft.Column([
-                    # Header do bottom sheet
+                    # Header com linha de arraste
+                    ft.Container(
+                        content=ft.Container(
+                            bgcolor="#E5E7EB",
+                            border_radius=3,
+                            height=4,
+                            width=40
+                        ),
+                        alignment=ft.alignment.center,
+                        padding=ft.padding.only(top=12, bottom=8)
+                    ),
+
+                    # Título e botão fechar
                     ft.Row([
                         ft.Text("💰 Investir na Meta", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
                         ft.IconButton(
                             icon=ft.Icons.CLOSE,
                             on_click=close_sheet_action,
-                            icon_color="#6B7280"
+                            icon_color="#6B7280",
+                            icon_size=20
                         )
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
 
-                    ft.Container(height=8),
+                    ft.Container(height=12),
 
-                    # Informações da meta
+                    # Card com informações da meta
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"Meta: {self.goals[goal_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
-                                    color="#1F2937"),
-                            ft.Text(f"Custo Total: {self.goals[goal_index]['total_cost']:,.0f} Kz", size=14,
-                                    color="#6B7280"),
-                            ft.Text(f"Já Investido: {self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=14,
-                                    color="#059669"),
-                            ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=14, color="#2563EB"),
-                        ], spacing=4),
-                        bgcolor="#F9FAFB",
+                            ft.Row([
+                                ft.Icon(ft.Icons.SAVINGS, color="#059669", size=20),
+                                ft.Text(f"{self.goals[goal_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
+                                        color="#1F2937", expand=True)
+                            ], spacing=8),
+                            ft.Container(height=8),
+                            ft.Row([
+                                ft.Column([
+                                    ft.Text("Custo Total", size=11, color="#6B7280"),
+                                    ft.Text(f"{self.goals[goal_index]['total_cost']:,.0f} Kz", size=13,
+                                            weight=ft.FontWeight.BOLD, color="#1F2937")
+                                ], spacing=2),
+                                ft.Column([
+                                    ft.Text("Já Investido", size=11, color="#6B7280"),
+                                    ft.Text(f"{self.goals[goal_index].get('saved_amount', 0):,.0f} Kz", size=13,
+                                            weight=ft.FontWeight.BOLD, color="#059669")
+                                ], spacing=2),
+                                ft.Column([
+                                    ft.Text("Saldo Disponível", size=11, color="#6B7280"),
+                                    ft.Text(f"{current_balance:,.0f} Kz", size=13, weight=ft.FontWeight.BOLD,
+                                            color="#2563EB")
+                                ], spacing=2),
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ], spacing=0),
+                        bgcolor="#F8FAFC",
                         border_radius=12,
                         padding=ft.padding.all(16),
-                        margin=ft.margin.only(bottom=16)
+                        border=ft.border.all(1, "#E2E8F0")
                     ),
 
-                    # Campo de input
+                    ft.Container(height=20),
+
+                    # Campo de valor
                     payment_field,
+
                     ft.Container(height=8),
+
+                    # Texto de erro
                     error_text,
-                    ft.Container(height=16),
+
+                    ft.Container(height=20),
 
                     # Botões
                     ft.Row([
@@ -929,7 +971,8 @@ class FinancialApp:
                             on_click=close_sheet_action,
                             bgcolor="#F3F4F6",
                             color="#374151",
-                            expand=1
+                            expand=1,
+                            height=48
                         ),
                         ft.Container(width=12),
                         ft.ElevatedButton(
@@ -937,30 +980,35 @@ class FinancialApp:
                             on_click=add_payment_action,
                             bgcolor="#059669",
                             color="#FFFFFF",
-                            expand=2
+                            expand=2,
+                            height=48
                         )
                     ]),
 
-                    ft.Container(height=20)  # Espaço no final
+                    # Espaço extra para o teclado
+                    ft.Container(height=32)
 
-                ], spacing=0),
-                padding=ft.padding.all(20),
+                ], spacing=0, scroll=ft.ScrollMode.AUTO),
+                padding=ft.padding.symmetric(horizontal=20, vertical=0),
                 bgcolor="#FFFFFF",
                 border_radius=ft.border_radius.only(top_left=20, top_right=20)
             ),
-            open=True
+            open=True,
+            maintain_bottom_view_insets_padding=True,  # Mantém padding quando teclado aparece
+            is_scroll_controlled=True,  # Permite scroll quando teclado aparece
+            use_safe_area=True  # Usa área segura do dispositivo
         )
 
-        # USA BottomSheet (SEM SOMBRAS!)
+        # Abre BottomSheet
         self.page.bottom_sheet = bottom_sheet
         self.page.update()
         print(f"Bottom sheet aberto para meta {goal_index}")
 
     def show_pay_debt_dialog(self, debt_index):
-        """BottomSheet para pagar dívida - SEM SOMBRAS!"""
+        """BottomSheet para pagar dívida - SE ADAPTA AO TECLADO"""
         print(f"Abrindo bottom sheet para dívida {debt_index}")
 
-        # Evita múltiplas chamadas usando controle manual
+        # Evita múltiplas chamadas
         if self.dialog_open:
             print("Diálogo já está aberto")
             return
@@ -986,27 +1034,24 @@ class FinancialApp:
             autofocus=True
         )
 
-        error_text = ft.Text("", size=12)
+        error_text = ft.Text("", size=12, color="#DC2626")
 
         def pay_debt_action(e):
             print(f"Processando pagamento para dívida {debt_index}")
             try:
                 if not payment_field.value or payment_field.value.strip() == "":
                     error_text.value = "❌ Digite um valor!"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
                 amount = float(payment_field.value.strip())
                 if amount <= 0:
                     error_text.value = "❌ Valor deve ser maior que zero!"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
                 if amount > current_balance:
                     error_text.value = f"❌ Saldo insuficiente! Disponível: {current_balance:,.0f} Kz"
-                    error_text.color = "#DC2626"
                     self.page.update()
                     return
 
@@ -1026,7 +1071,7 @@ class FinancialApp:
                 self.save_data()
 
                 # Fecha bottom sheet
-                self.close_all_dialogs()
+                self.close_dialog()
 
                 # Atualiza views
                 self.update_all_views()
@@ -1043,56 +1088,89 @@ class FinancialApp:
 
             except ValueError:
                 error_text.value = "❌ Valor inválido! Use apenas números."
-                error_text.color = "#DC2626"
                 self.page.update()
             except Exception as ex:
                 print(f"Erro ao processar pagamento: {ex}")
                 error_text.value = f"❌ Erro: {str(ex)}"
-                error_text.color = "#DC2626"
                 self.page.update()
 
         def close_sheet_action(e):
             print("Fechando bottom sheet de dívida")
-            self.close_all_dialogs()
+            self.close_dialog()
 
-        # Cria BottomSheet (SEM SOMBRAS!)
+        # Cria BottomSheet que se adapta ao teclado
         bottom_sheet = ft.BottomSheet(
             content=ft.Container(
                 content=ft.Column([
-                    # Header do bottom sheet
+                    # Header com linha de arraste
+                    ft.Container(
+                        content=ft.Container(
+                            bgcolor="#E5E7EB",
+                            border_radius=3,
+                            height=4,
+                            width=40
+                        ),
+                        alignment=ft.alignment.center,
+                        padding=ft.padding.only(top=12, bottom=8)
+                    ),
+
+                    # Título e botão fechar
                     ft.Row([
                         ft.Text("💳 Pagar Dívida", size=20, weight=ft.FontWeight.BOLD, color="#1F2937"),
                         ft.IconButton(
                             icon=ft.Icons.CLOSE,
                             on_click=close_sheet_action,
-                            icon_color="#6B7280"
+                            icon_color="#6B7280",
+                            icon_size=20
                         )
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
 
-                    ft.Container(height=8),
+                    ft.Container(height=12),
 
-                    # Informações da dívida
+                    # Card com informações da dívida
                     ft.Container(
                         content=ft.Column([
-                            ft.Text(f"Dívida: {self.debts[debt_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
-                                    color="#1F2937"),
-                            ft.Text(f"Total: {self.debts[debt_index]['total_amount']:,.0f} Kz", size=14,
-                                    color="#6B7280"),
-                            ft.Text(f"Já Pago: {self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=14,
-                                    color="#DC2626"),
-                            ft.Text(f"Saldo Disponível: {current_balance:,.0f} Kz", size=14, color="#2563EB"),
-                        ], spacing=4),
-                        bgcolor="#F9FAFB",
+                            ft.Row([
+                                ft.Icon(ft.Icons.PAYMENT, color="#DC2626", size=20),
+                                ft.Text(f"{self.debts[debt_index]['name']}", size=16, weight=ft.FontWeight.BOLD,
+                                        color="#1F2937", expand=True)
+                            ], spacing=8),
+                            ft.Container(height=8),
+                            ft.Row([
+                                ft.Column([
+                                    ft.Text("Total", size=11, color="#6B7280"),
+                                    ft.Text(f"{self.debts[debt_index]['total_amount']:,.0f} Kz", size=13,
+                                            weight=ft.FontWeight.BOLD, color="#1F2937")
+                                ], spacing=2),
+                                ft.Column([
+                                    ft.Text("Já Pago", size=11, color="#6B7280"),
+                                    ft.Text(f"{self.debts[debt_index].get('paid_amount', 0):,.0f} Kz", size=13,
+                                            weight=ft.FontWeight.BOLD, color="#DC2626")
+                                ], spacing=2),
+                                ft.Column([
+                                    ft.Text("Saldo Disponível", size=11, color="#6B7280"),
+                                    ft.Text(f"{current_balance:,.0f} Kz", size=13, weight=ft.FontWeight.BOLD,
+                                            color="#2563EB")
+                                ], spacing=2),
+                            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                        ], spacing=0),
+                        bgcolor="#FEF2F2",
                         border_radius=12,
                         padding=ft.padding.all(16),
-                        margin=ft.margin.only(bottom=16)
+                        border=ft.border.all(1, "#FECACA")
                     ),
 
-                    # Campo de input
+                    ft.Container(height=20),
+
+                    # Campo de valor
                     payment_field,
+
                     ft.Container(height=8),
+
+                    # Texto de erro
                     error_text,
-                    ft.Container(height=16),
+
+                    ft.Container(height=20),
 
                     # Botões
                     ft.Row([
@@ -1101,7 +1179,8 @@ class FinancialApp:
                             on_click=close_sheet_action,
                             bgcolor="#F3F4F6",
                             color="#374151",
-                            expand=1
+                            expand=1,
+                            height=48
                         ),
                         ft.Container(width=12),
                         ft.ElevatedButton(
@@ -1109,21 +1188,26 @@ class FinancialApp:
                             on_click=pay_debt_action,
                             bgcolor="#DC2626",
                             color="#FFFFFF",
-                            expand=2
+                            expand=2,
+                            height=48
                         )
                     ]),
 
-                    ft.Container(height=20)  # Espaço no final
+                    # Espaço extra para o teclado
+                    ft.Container(height=32)
 
-                ], spacing=0),
-                padding=ft.padding.all(20),
+                ], spacing=0, scroll=ft.ScrollMode.AUTO),
+                padding=ft.padding.symmetric(horizontal=20, vertical=0),
                 bgcolor="#FFFFFF",
                 border_radius=ft.border_radius.only(top_left=20, top_right=20)
             ),
-            open=True
+            open=True,
+            maintain_bottom_view_insets_padding=True,  # Mantém padding quando teclado aparece
+            is_scroll_controlled=True,  # Permite scroll quando teclado aparece
+            use_safe_area=True  # Usa área segura do dispositivo
         )
 
-        # USA BottomSheet (SEM SOMBRAS!)
+        # Abre BottomSheet
         self.page.bottom_sheet = bottom_sheet
         self.page.update()
         print(f"Bottom sheet aberto para dívida {debt_index}")
@@ -1448,7 +1532,7 @@ class FinancialApp:
             self.expenses_list.controls.append(expense_item)
 
     def update_goals_list(self):
-        """Atualiza lista de metas - CORRIGIDO COM HANDLER ROBUSTO"""
+        """Atualiza lista de metas"""
         self.goals_list.controls.clear()
 
         for i, goal in enumerate(self.goals):
@@ -1474,20 +1558,7 @@ class FinancialApp:
             def create_invest_click_handler(goal_index):
                 def handle_invest_click(e):
                     print(f"Clique no botão investir para meta {goal_index}")
-                    try:
-                        # Evita múltiplas chamadas usando controle manual
-                        if self.dialog_open:
-                            print("Já existe um diálogo aberto (controle manual)")
-                            return
-                        self.show_add_payment_dialog(goal_index)
-                    except Exception as ex:
-                        print(f"Erro no handler de investir: {ex}")
-                        self.page.snack_bar = ft.SnackBar(
-                            content=ft.Text(f"❌ Erro: {str(ex)}"),
-                            bgcolor="#DC2626"
-                        )
-                        self.page.snack_bar.open = True
-                        self.page.update()
+                    self.show_add_payment_dialog(goal_index)
 
                 return handle_invest_click
 
@@ -1511,15 +1582,14 @@ class FinancialApp:
 
                 return handle_remove_click
 
-            # CORRIGIDO: Botão de investir mais robusto
+            # Botão de investir
             if can_invest:
-                invest_button = ft.Container(
-                    content=ft.Text("💰 Investir", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
-                    bgcolor="#ECFDF5",
-                    border_radius=6,
-                    padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                invest_button = ft.ElevatedButton(
+                    text="💰 Investir",
                     on_click=create_invest_click_handler(i),
-                    ink=True  # Adiciona efeito visual de clique
+                    bgcolor="#059669",
+                    color="#FFFFFF",
+                    height=32
                 )
             else:
                 invest_button = ft.Container(
@@ -1568,7 +1638,7 @@ class FinancialApp:
             self.goals_list.controls.append(goal_card)
 
     def update_debts_list(self):
-        """Atualiza lista de dívidas - CORRIGIDO COM HANDLER ROBUSTO"""
+        """Atualiza lista de dívidas"""
         self.debts_list.controls.clear()
 
         for i, debt in enumerate(self.debts):
@@ -1590,20 +1660,7 @@ class FinancialApp:
             def create_pay_click_handler(debt_index):
                 def handle_pay_click(e):
                     print(f"Clique no botão pagar para dívida {debt_index}")
-                    try:
-                        # Evita múltiplas chamadas usando controle manual
-                        if self.dialog_open:
-                            print("Já existe um diálogo aberto (controle manual)")
-                            return
-                        self.show_pay_debt_dialog(debt_index)
-                    except Exception as ex:
-                        print(f"Erro no handler de pagar: {ex}")
-                        self.page.snack_bar = ft.SnackBar(
-                            content=ft.Text(f"❌ Erro: {str(ex)}"),
-                            bgcolor="#DC2626"
-                        )
-                        self.page.snack_bar.open = True
-                        self.page.update()
+                    self.show_pay_debt_dialog(debt_index)
 
                 return handle_pay_click
 
@@ -1627,15 +1684,14 @@ class FinancialApp:
 
                 return handle_remove_click
 
-            # CORRIGIDO: Botão de pagamento mais robusto
+            # Botão de pagamento
             if can_pay:
-                pay_button = ft.Container(
-                    content=ft.Text("💳 Pagar", size=12, weight=ft.FontWeight.BOLD, color="#DC2626"),
-                    bgcolor="#FEF2F2",
-                    border_radius=6,
-                    padding=ft.padding.symmetric(horizontal=12, vertical=6),
+                pay_button = ft.ElevatedButton(
+                    text="💳 Pagar",
                     on_click=create_pay_click_handler(i),
-                    ink=True  # Adiciona efeito visual de clique
+                    bgcolor="#DC2626",
+                    color="#FFFFFF",
+                    height=32
                 )
             else:
                 pay_button = ft.Container(
