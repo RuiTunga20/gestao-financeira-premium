@@ -55,9 +55,13 @@ class FinancialApp:
             goals_data = self.page.client_storage.get("goals")
             self.goals = json.loads(goals_data) if goals_data else []
 
-            # Nova funcionalidade: Dívidas
+            # Dívidas a pagar
             debts_data = self.page.client_storage.get("debts")
             self.debts = json.loads(debts_data) if debts_data else []
+
+            # NOVA FUNCIONALIDADE: Dívidas a receber
+            debts_to_receive_data = self.page.client_storage.get("debts_to_receive")
+            self.debts_to_receive = json.loads(debts_to_receive_data) if debts_to_receive_data else []
 
             current_month_data = self.page.client_storage.get("current_month")
             self.current_month = current_month_data if current_month_data else datetime.now().strftime("%m/%Y")
@@ -69,6 +73,7 @@ class FinancialApp:
             self.expenses = []
             self.goals = []
             self.debts = []
+            self.debts_to_receive = []  # Nova lista
             self.current_month = datetime.now().strftime("%m/%Y")
 
     def save_data(self):
@@ -78,6 +83,7 @@ class FinancialApp:
         self.page.client_storage.set("expenses", json.dumps(self.expenses))
         self.page.client_storage.set("goals", json.dumps(self.goals))
         self.page.client_storage.set("debts", json.dumps(self.debts))
+        self.page.client_storage.set("debts_to_receive", json.dumps(self.debts_to_receive))  # Nova linha
         self.page.client_storage.set("current_month", self.current_month)
 
     def check_new_month(self):
@@ -180,7 +186,7 @@ class FinancialApp:
         )
 
     def create_fixed_header(self):
-        """Cria cabeçalho fixo compacto"""
+        """Cria cabeçalho fixo compacto com indicador de swipe"""
         headers = [
             "💳 Controle Financeiro",
             "🎯 Metas & Objetivos",
@@ -196,13 +202,37 @@ class FinancialApp:
             color="#1F2937"
         )
 
-        return ft.Container(
+        # Indicador de swipe mais discreto
+        swipe_indicator = ft.Container(
             content=ft.Row([
-                self.header_text
-            ], alignment=ft.MainAxisAlignment.CENTER),
-            padding=ft.padding.symmetric(vertical=12, horizontal=20),
+                ft.Icon(ft.Icons.SWIPE_LEFT, size=12, color="#9CA3AF"),
+                ft.Text("Deslize para navegar", size=9, color="#9CA3AF"),
+                ft.Icon(ft.Icons.SWIPE_RIGHT, size=12, color="#9CA3AF")
+            ], spacing=6, alignment=ft.MainAxisAlignment.CENTER),
+            bgcolor="#F8FAFC",
+            border_radius=12,
+            padding=ft.padding.symmetric(horizontal=12, vertical=2)
+        )
+
+        return ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    self.header_text
+                ], alignment=ft.MainAxisAlignment.CENTER),
+                ft.Container(height=4),
+                swipe_indicator
+            ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+            padding=ft.padding.symmetric(vertical=8, horizontal=20),
             height=70,
-            alignment=ft.alignment.center
+            alignment=ft.alignment.center,
+            bgcolor="#FFFFFF",
+            border=ft.border.only(bottom=ft.BorderSide(1, "#E5E7EB")),
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=4,
+                color="#1F293720",
+                offset=ft.Offset(0, 2)
+            )
         )
 
     def show_snack_bar(self, message, bgcolor="#059669"):
@@ -219,25 +249,6 @@ class FinancialApp:
             self.page.update()
         except Exception as e:
             print(f"Erro ao mostrar snack bar: {e}")
-        """Fecha diálogo de forma limpa"""
-        try:
-            print("Fechando diálogo...")
-
-            # Fecha diálogo usando método moderno
-            if hasattr(self.page, 'dialog') and self.page.dialog:
-                self.page.dialog.open = False
-
-            # Reset do controle manual
-            self.dialog_open = False
-
-            # Atualização única
-            self.page.update()
-
-            print("Diálogo fechado com sucesso!")
-
-        except Exception as e:
-            print(f"Erro ao fechar diálogo: {e}")
-            self.dialog_open = False
 
     def close_dialog(self):
         """Fecha diálogo de forma limpa"""
@@ -564,7 +575,7 @@ class FinancialApp:
         ], scroll=ft.ScrollMode.AUTO, spacing=0)
 
     def create_extras_view(self):
-        """Cria a vista de extras (renda extra + dívidas) otimizada para mobile"""
+        """Cria a vista de extras (renda extra + dívidas + dívidas a receber) otimizada para mobile"""
         # Campos renda extra
         self.extra_income_description = ft.Container(
             content=ft.TextField(
@@ -593,7 +604,7 @@ class FinancialApp:
             margin=ft.margin.only(bottom=12)
         )
 
-        # Campos dívida
+        # Campos dívida a pagar
         self.debt_name = ft.Container(
             content=ft.TextField(
                 label="💳 Nome da Dívida",
@@ -635,13 +646,62 @@ class FinancialApp:
             margin=ft.margin.only(bottom=12)
         )
 
-        # Lista dívidas
+        # NOVOS CAMPOS: Dívidas a receber
+        self.debt_to_receive_name = ft.Container(
+            content=ft.TextField(
+                label="👤 Quem deve (Nome/Descrição)",
+                bgcolor="#FFFFFF",
+                border_color="#E5E7EB",
+                focused_border_color="#059669",
+                border_radius=12,
+                content_padding=ft.padding.all(16),
+                text_size=14
+            ),
+            margin=ft.margin.only(bottom=12)
+        )
+
+        self.debt_to_receive_amount = ft.Container(
+            content=ft.TextField(
+                label="💰 Valor da Dívida (Kz)",
+                keyboard_type=ft.KeyboardType.NUMBER,
+                bgcolor="#FFFFFF",
+                border_color="#E5E7EB",
+                focused_border_color="#059669",
+                border_radius=12,
+                content_padding=ft.padding.all(16),
+                text_size=14
+            ),
+            margin=ft.margin.only(bottom=12)
+        )
+
+        self.debt_to_receive_due_date = ft.Container(
+            content=ft.TextField(
+                label="📅 Data de Vencimento (DD/MM/AAAA)",
+                bgcolor="#FFFFFF",
+                border_color="#E5E7EB",
+                focused_border_color="#059669",
+                border_radius=12,
+                content_padding=ft.padding.all(16),
+                text_size=14
+            ),
+            margin=ft.margin.only(bottom=12)
+        )
+
+        # Lista dívidas a pagar
         self.debts_list = ft.ListView(
             spacing=8,
-            height=250,
+            height=200,
             padding=ft.padding.all(0)
         )
         self.update_debts_list()
+
+        # Lista dívidas a receber
+        self.debts_to_receive_list = ft.ListView(
+            spacing=8,
+            height=200,
+            padding=ft.padding.all(0)
+        )
+        self.update_debts_to_receive_list()
 
         self.extras_view = ft.Column([
             # SEÇÃO RENDA EXTRA
@@ -653,16 +713,30 @@ class FinancialApp:
 
             ft.Container(height=24),
 
-            # SEÇÃO DÍVIDAS
-            ft.Text("💳 Dívidas", size=18, weight=ft.FontWeight.BOLD, color="#DC2626"),
+            # SEÇÃO DÍVIDAS A PAGAR
+            ft.Text("💳 Dívidas a Pagar", size=18, weight=ft.FontWeight.BOLD, color="#DC2626"),
             ft.Text("Cartões, empréstimos, financiamentos", size=12, color="#6B7280"),
             self.debt_name,
             self.debt_total_amount,
             self.debt_monthly_payment,
             self.create_mobile_button("Adicionar Dívida", self.add_debt, ft.Icons.ADD_CIRCLE, "#DC2626"),
 
-            ft.Text("📋 Minhas Dívidas", size=18, weight=ft.FontWeight.BOLD, color="#1F2937"),
-            self.create_mobile_card(self.debts_list)
+            ft.Text("📋 Minhas Dívidas", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
+            self.create_mobile_card(self.debts_list),
+
+            ft.Container(height=24),
+
+            # NOVA SEÇÃO: DÍVIDAS A RECEBER
+            ft.Text("💸 Dívidas a Receber", size=18, weight=ft.FontWeight.BOLD, color="#059669"),
+            ft.Text("Pessoas que me devem dinheiro", size=12, color="#6B7280"),
+            self.debt_to_receive_name,
+            self.debt_to_receive_amount,
+            self.debt_to_receive_due_date,
+            self.create_mobile_button("Adicionar Dívida a Receber", self.add_debt_to_receive, ft.Icons.ADD_CIRCLE,
+                                      "#059669"),
+
+            ft.Text("📋 Dívidas a Receber", size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
+            self.create_mobile_card(self.debts_to_receive_list)
 
         ], scroll=ft.ScrollMode.AUTO, spacing=0)
 
@@ -670,6 +744,10 @@ class FinancialApp:
         """Cria a vista de resumo otimizada para mobile com categorias"""
         total_spent, current_balance = self.calculate_totals()
         regular_expenses, goal_payments, debt_payments, extra_income = self.categorize_transactions()
+
+        # Calcula total a receber
+        total_to_receive = sum(
+            debt.get('total_amount', 0) - debt.get('received_amount', 0) for debt in self.debts_to_receive)
 
         # Cards estatísticas mobile
         stats_cards = ft.Column([
@@ -683,7 +761,7 @@ class FinancialApp:
                 self.create_stat_card_mobile("💎", "Saldo", f"{current_balance:,.0f}", "Kz",
                                              "#059669" if current_balance >= 0 else "#DC2626"),
                 ft.Container(width=8),
-                self.create_stat_card_mobile("🎯", "Metas", str(len(self.goals)), "", "#8B5CF6")
+                self.create_stat_card_mobile("📥", "A Receber", f"{total_to_receive:,.0f}", "Kz", "#8B5CF6")
             ])
         ])
 
@@ -774,92 +852,163 @@ class FinancialApp:
         )
 
     def setup_layout(self):
-        """Configura o layout com header e navegação REALMENTE FIXOS"""
+        """Configura o layout com header e navegação REALMENTE FIXOS e navegação por gestos"""
+
         # Header fixo
         self.header = self.create_fixed_header()
 
-        # Container do conteúdo scrollable
-        self.content_container = ft.Container(
-            content=self.finances_view,
-            expand=True,
-            padding=ft.padding.only(left=12, right=12, top=8, bottom=8)
-        )
-
         # Navegação fixa
-        self.navigation_bar = ft.NavigationBar(
-            destinations=[
-                ft.NavigationBarDestination(icon=ft.Icons.CREDIT_CARD_OUTLINED, label="Finanças",
-                                            selected_icon=ft.Icons.CREDIT_CARD),
-                ft.NavigationBarDestination(icon=ft.Icons.SAVINGS_OUTLINED, label="Metas",
-                                            selected_icon=ft.Icons.SAVINGS),
-                ft.NavigationBarDestination(icon=ft.Icons.PAYMENT_OUTLINED, label="Extras",
-                                            selected_icon=ft.Icons.PAYMENT),
-                ft.NavigationBarDestination(icon=ft.Icons.ANALYTICS_OUTLINED, label="Dashboard",
-                                            selected_icon=ft.Icons.ANALYTICS)
-            ],
-            on_change=self.navigation_changed,
+        self.navigation_bar = ft.Container(
+            content=ft.NavigationBar(
+                destinations=[
+                    ft.NavigationBarDestination(icon=ft.Icons.CREDIT_CARD_OUTLINED, label="Finanças",
+                                                selected_icon=ft.Icons.CREDIT_CARD),
+                    ft.NavigationBarDestination(icon=ft.Icons.SAVINGS_OUTLINED, label="Metas",
+                                                selected_icon=ft.Icons.SAVINGS),
+                    ft.NavigationBarDestination(icon=ft.Icons.PAYMENT_OUTLINED, label="Extras",
+                                                selected_icon=ft.Icons.PAYMENT),
+                    ft.NavigationBarDestination(icon=ft.Icons.ANALYTICS_OUTLINED, label="Dashboard",
+                                                selected_icon=ft.Icons.ANALYTICS)
+                ],
+                on_change=self.navigation_changed,
+                bgcolor="#FFFFFF",
+                indicator_color="#EFF6FF",
+                selected_index=0,
+                label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW
+            ),
             bgcolor="#FFFFFF",
-            indicator_color="#EFF6FF",
-            selected_index=0,
-            label_behavior=ft.NavigationBarLabelBehavior.ALWAYS_SHOW,
-            height=64
+            border=ft.border.only(top=ft.BorderSide(1, "#E5E7EB")),
+            shadow=ft.BoxShadow(
+                spread_radius=0,
+                blur_radius=8,
+                color="#1F293720",
+                offset=ft.Offset(0, -2)
+            ),
+            height=80
         )
 
-        # Layout usando Stack para posicionamento absoluto (REALMENTE FIXO)
-        layout = ft.Stack([
-            # Conteúdo principal
-            ft.Container(
-                content=ft.Column([
-                    # Espaço para o header
-                    ft.Container(height=70),
-                    # Conteúdo scrollable
-                    ft.Container(
-                        content=self.content_container,
-                        expand=True
-                    ),
-                    # Espaço para a navegação
-                    ft.Container(height=72)
-                ]),
-                expand=True
+        # Container do conteúdo com detecção de gestos
+        self.content_container = ft.GestureDetector(
+            content=ft.Container(
+                content=self.finances_view,
+                padding=ft.padding.only(left=12, right=12, top=8, bottom=8),
+                expand=True,
+                bgcolor="#FAFBFF"
             ),
+            on_horizontal_drag_end=self.handle_swipe_gesture,
+            expand=True
+        )
 
-            # Header fixo no topo
-            ft.Container(
-                content=self.header,
-                top=0,
-                left=0,
-                right=0,
-                height=70,
-                bgcolor="#FFFFFF",
-                shadow=ft.BoxShadow(
-                    spread_radius=0,
-                    blur_radius=4,
-                    color="#1F293720",
-                    offset=ft.Offset(0, 2)
-                )
-            ),
+        # Container principal que força o layout fixo - ALTURA DEFINIDA
+        self.page.window.height = 800  # Define altura da janela
 
-            # Navegação fixa no fundo
-            ft.Container(
-                content=self.navigation_bar,
-                bottom=0,
-                left=0,
-                right=0,
-                height=72,
-                bgcolor="#FFFFFF",
-                shadow=ft.BoxShadow(
-                    spread_radius=0,
-                    blur_radius=8,
-                    color="#1F293720",
-                    offset=ft.Offset(0, -2)
-                )
-            )
-        ])
+        main_container = ft.Container(
+            content=ft.Column([
+                # Header sempre no topo (altura fixa - ajustada para o indicador)
+                ft.Container(
+                    content=self.header,
+                    height=70
+                ),
 
-        # Adiciona o layout na página
-        self.page.add(layout)
+                # Conteúdo que expande mas fica entre header e nav
+                self.content_container,
 
-    def show_add_payment_dialog(self, goal_index):
+                # Navegação sempre no fundo (altura fixa)
+                self.navigation_bar
+            ], spacing=0),
+            height=self.page.window.height,  # Altura total da tela
+            bgcolor="#FAFBFF"
+        )
+
+        # Adiciona na página
+        self.page.add(main_container)
+
+    def handle_swipe_gesture(self, e):
+        """Detecta gestos de swipe horizontal para navegar"""
+        try:
+            # Calcula a direção do swipe baseado na velocidade
+            if hasattr(e, 'velocity') and e.velocity:
+                velocity_x = e.velocity.pixels_per_second.dx
+
+                # Swipe para direita (velocidade negativa) = página anterior
+                if velocity_x < -500:  # Limiar de velocidade
+                    if self.current_view_index > 0:
+                        new_index = self.current_view_index - 1
+                        self.change_page_by_swipe(new_index)
+
+                # Swipe para esquerda (velocidade positiva) = próxima página
+                elif velocity_x > 500:  # Limiar de velocidade
+                    if self.current_view_index < 3:
+                        new_index = self.current_view_index + 1
+                        self.change_page_by_swipe(new_index)
+        except Exception as ex:
+            print(f"Erro no gesto: {ex}")
+
+    def change_page_by_swipe(self, new_index):
+        """Muda de página por swipe e atualiza tudo"""
+        self.current_view_index = new_index
+
+        # Atualiza header
+        headers = [
+            "💳 Controle Financeiro",
+            "🎯 Metas & Objetivos",
+            "💰 Extras & Dívidas",
+            "📊 Dashboard"
+        ]
+
+        if hasattr(self, 'header_text'):
+            self.header_text.value = headers[new_index]
+
+        # Atualiza o índice selecionado na navegação
+        if hasattr(self, 'navigation_bar'):
+            nav_bar = self.navigation_bar.content
+            nav_bar.selected_index = new_index
+
+        # Atualiza o conteúdo
+        self.update_content_for_current_view()
+
+        self.page.update()
+
+    def navigation_changed(self, e):
+        """Gerencia navegação pelos botões"""
+        selected_index = e.control.selected_index
+        self.current_view_index = selected_index
+
+        # Atualiza header
+        headers = [
+            "💳 Controle Financeiro",
+            "🎯 Metas & Objetivos",
+            "💰 Extras & Dívidas",
+            "📊 Dashboard"
+        ]
+
+        if hasattr(self, 'header_text'):
+            self.header_text.value = headers[selected_index]
+
+        # Atualiza o conteúdo
+        self.update_content_for_current_view()
+
+        self.page.update()
+
+    def update_content_for_current_view(self):
+        """Atualiza o conteúdo baseado na view atual"""
+        # Primeiro atualiza a view
+        if self.current_view_index == 0:
+            self.update_finances_view()
+            new_content = self.finances_view
+        elif self.current_view_index == 1:
+            self.update_goals_view()
+            new_content = self.goals_view
+        elif self.current_view_index == 2:
+            self.update_extras_view()
+            new_content = self.extras_view
+        elif self.current_view_index == 3:
+            self.update_summary_view()
+            new_content = self.summary_view
+
+        # Atualiza o conteúdo no container
+        if hasattr(self, 'content_container'):
+            self.content_container.content.content = new_content
         """Diálogo centralizado que se adapta ao teclado"""
         print(f"Abrindo diálogo para meta {goal_index}")
 
@@ -1273,6 +1422,223 @@ class FinancialApp:
 
         print(f"Diálogo centralizado aberto para dívida {debt_index}")
 
+    def show_receive_payment_dialog(self, debt_to_receive_index):
+        """Diálogo para receber pagamento de dívida"""
+        print(f"Abrindo diálogo para receber pagamento da dívida {debt_to_receive_index}")
+
+        # Evita múltiplas chamadas
+        if self.dialog_open:
+            print("Diálogo já está aberto")
+            return
+
+        self.dialog_open = True
+
+        # Verifica se a dívida existe
+        if debt_to_receive_index >= len(self.debts_to_receive):
+            print(f"Erro: Dívida a receber {debt_to_receive_index} não existe")
+            self.dialog_open = False
+            return
+
+        payment_field = ft.TextField(
+            label="Valor Recebido (Kz)",
+            keyboard_type=ft.KeyboardType.NUMBER,
+            bgcolor="#FFFFFF",
+            border_color="#E5E7EB",
+            focused_border_color="#059669",
+            border_radius=12,
+            content_padding=ft.padding.all(16),
+            text_size=14,
+            autofocus=True
+        )
+
+        error_text = ft.Text("", size=12, color="#DC2626")
+
+        def receive_payment_action(e):
+            print(f"Processando recebimento para dívida {debt_to_receive_index}")
+            try:
+                if not payment_field.value or payment_field.value.strip() == "":
+                    error_text.value = "❌ Digite um valor!"
+                    self.page.update()
+                    return
+
+                amount = float(payment_field.value.strip())
+                if amount <= 0:
+                    error_text.value = "❌ Valor deve ser maior que zero!"
+                    self.page.update()
+                    return
+
+                debt = self.debts_to_receive[debt_to_receive_index]
+                received_amount = debt.get('received_amount', 0)
+                remaining = debt['total_amount'] - received_amount
+
+                if amount > remaining:
+                    error_text.value = f"❌ Valor maior que o restante da dívida! Máximo: {remaining:,.0f} Kz"
+                    self.page.update()
+                    return
+
+                # Adiciona pagamento à dívida a receber
+                if 'received_amount' not in self.debts_to_receive[debt_to_receive_index]:
+                    self.debts_to_receive[debt_to_receive_index]['received_amount'] = 0
+                self.debts_to_receive[debt_to_receive_index]['received_amount'] += amount
+
+                # IMPORTANTE: Adiciona o valor ao saldo atual
+                self.accumulated_balance += amount
+                self.salary = self.base_salary + self.accumulated_balance
+
+                # Adiciona como renda extra nas transações
+                payment_income = {
+                    'description': f"💸 Recebido: {self.debts_to_receive[debt_to_receive_index]['name']}",
+                    'amount': -amount,  # Negativo para indicar entrada de dinheiro
+                    'date': datetime.now().strftime("%d/%m/%Y")
+                }
+                self.expenses.append(payment_income)
+
+                self.save_data()
+
+                # Fecha diálogo
+                try:
+                    if hasattr(self.page, 'close'):
+                        self.page.close(dialog)
+                    else:
+                        dialog.open = False
+                        self.page.update()
+                    self.dialog_open = False
+                except Exception as dialog_ex:
+                    print(f"Erro ao fechar diálogo: {dialog_ex}")
+                    dialog.open = False
+                    self.dialog_open = False
+                    self.page.update()
+
+                # Atualiza views
+                self.update_all_views()
+
+                # Mostra sucesso
+                self.show_snack_bar("💸 Pagamento recebido com sucesso!", "#059669")
+
+                print(f"Recebimento de {amount} realizado com sucesso para dívida {debt_to_receive_index}")
+
+            except ValueError:
+                error_text.value = "❌ Valor inválido! Use apenas números."
+                self.page.update()
+            except Exception as ex:
+                print(f"Erro ao processar recebimento: {ex}")
+                error_text.value = f"❌ Erro: {str(ex)}"
+                self.page.update()
+
+        def close_dialog_action(e):
+            """Handler para fechar diálogo de recebimento"""
+            try:
+                print("Fechando diálogo de recebimento")
+                if hasattr(self.page, 'close'):
+                    self.page.close(dialog)
+                else:
+                    dialog.open = False
+                    self.page.update()
+                self.dialog_open = False
+            except Exception as ex:
+                print(f"Erro ao fechar diálogo de recebimento: {ex}")
+                dialog.open = False
+                self.dialog_open = False
+                self.page.update()
+
+        debt = self.debts_to_receive[debt_to_receive_index]
+        received_amount = debt.get('received_amount', 0)
+        remaining = debt['total_amount'] - received_amount
+
+        # Diálogo centralizado
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Row([
+                ft.Icon(ft.Icons.ARROW_DOWNWARD, color="#059669", size=22),
+                ft.Text("Receber Pagamento", size=16, weight=ft.FontWeight.BOLD, color="#1F2937")
+            ], spacing=8, alignment=ft.MainAxisAlignment.CENTER),
+            content=ft.Container(
+                content=ft.Column([
+                    # Card com informações compactas
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(f"💸 {debt['name']}",
+                                    size=16, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                            ft.Container(height=8),
+                            ft.Row([
+                                ft.Column([
+                                    ft.Text("Total", size=10, color="#6B7280"),
+                                    ft.Text(f"{debt['total_amount']:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                                ft.Column([
+                                    ft.Text("Recebido", size=10, color="#6B7280"),
+                                    ft.Text(f"{received_amount:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                                ft.Column([
+                                    ft.Text("Restante", size=10, color="#6B7280"),
+                                    ft.Text(f"{remaining:,.0f}",
+                                            size=12, weight=ft.FontWeight.BOLD, color="#DC2626"),
+                                    ft.Text("Kz", size=9, color="#9CA3AF")
+                                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=1),
+                            ], alignment=ft.MainAxisAlignment.SPACE_AROUND),
+                            ft.Container(height=8),
+                            ft.Text(f"📅 Vencimento: {debt.get('due_date', 'N/A')}",
+                                    size=11, color="#6B7280")
+                        ]),
+                        bgcolor="#F0FDF4",
+                        border_radius=12,
+                        padding=ft.padding.all(16),
+                        border=ft.border.all(1, "#BBF7D0"),
+                        margin=ft.margin.only(bottom=16)
+                    ),
+
+                    # Campo de input
+                    payment_field,
+
+                    ft.Container(height=8),
+
+                    # Texto de erro
+                    error_text
+
+                ], tight=True, spacing=0),
+                width=300,
+                padding=ft.padding.all(4)
+            ),
+            actions=[
+                ft.Row([
+                    ft.TextButton(
+                        "Cancelar",
+                        on_click=close_dialog_action,
+                        style=ft.ButtonStyle(
+                            color="#6B7280",
+                            overlay_color="#F3F4F6"
+                        )
+                    ),
+                    ft.ElevatedButton(
+                        "💸 Receber",
+                        on_click=receive_payment_action,
+                        bgcolor="#059669",
+                        color="#FFFFFF",
+                        style=ft.ButtonStyle(
+                            shape=ft.RoundedRectangleBorder(radius=8)
+                        )
+                    )
+                ], alignment=ft.MainAxisAlignment.END, spacing=8)
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+            content_padding=ft.padding.all(0),
+            title_padding=ft.padding.all(20),
+            actions_padding=ft.padding.symmetric(horizontal=20, vertical=16),
+            shape=ft.RoundedRectangleBorder(radius=16),
+            bgcolor="#FFFFFF",
+            surface_tint_color="#FFFFFF"
+        )
+
+        # Método moderno para abrir diálogo centralizado
+        self.page.open(dialog)
+        self.page.update()
+
+        print(f"Diálogo de recebimento aberto para dívida {debt_to_receive_index}")
+
     def navigation_changed(self, e):
         """Gerencia navegação e atualiza header"""
         selected_index = e.control.selected_index
@@ -1429,6 +1795,38 @@ class FinancialApp:
             self.update_all_views()
 
             self.show_snack_bar("💳 Dívida adicionada!", "#DC2626")
+        except ValueError:
+            self.show_snack_bar("❌ Valores inválidos!", "#DC2626")
+
+    def add_debt_to_receive(self, e):
+        """Adiciona dívida a receber"""
+        name_field = self.debt_to_receive_name.content
+        amount_field = self.debt_to_receive_amount.content
+        due_date_field = self.debt_to_receive_due_date.content
+
+        if not all([name_field.value, amount_field.value, due_date_field.value]):
+            self.show_snack_bar("❌ Preencha todos os campos!", "#DC2626")
+            return
+
+        try:
+            debt_to_receive = {
+                'name': name_field.value,
+                'total_amount': float(amount_field.value),
+                'due_date': due_date_field.value,
+                'received_amount': 0,
+                'created_date': datetime.now().strftime("%d/%m/%Y")
+            }
+
+            self.debts_to_receive.append(debt_to_receive)
+            self.save_data()
+
+            name_field.value = ""
+            amount_field.value = ""
+            due_date_field.value = ""
+
+            self.update_all_views()
+
+            self.show_snack_bar("💸 Dívida a receber adicionada!", "#059669")
         except ValueError:
             self.show_snack_bar("❌ Valores inválidos!", "#DC2626")
 
@@ -1726,6 +2124,104 @@ class FinancialApp:
                 margin=ft.margin.only(bottom=8)
             )
             self.debts_list.controls.append(debt_card)
+
+    def update_debts_to_receive_list(self):
+        """Atualiza lista de dívidas a receber"""
+        self.debts_to_receive_list.controls.clear()
+
+        for i, debt in enumerate(self.debts_to_receive):
+            received_amount = debt.get('received_amount', 0)
+            progress = received_amount / debt['total_amount'] if debt['total_amount'] > 0 else 0
+            remaining = debt['total_amount'] - received_amount
+
+            # Status da dívida a receber
+            if progress >= 1.0:
+                status_text = "✅ Recebida!"
+                status_color = "#059669"
+                can_receive = False
+            else:
+                status_text = f"💸 Faltam {remaining:,.0f} Kz"
+                status_color = "#059669"
+                can_receive = True
+
+            # Função para criar handler de clique seguro
+            def create_receive_click_handler(debt_index):
+                def handle_receive_click(e):
+                    print(f"Clique no botão receber para dívida {debt_index}")
+                    self.show_receive_payment_dialog(debt_index)
+
+                return handle_receive_click
+
+            # Função para criar handler de remoção seguro
+            def create_remove_click_handler(debt_index):
+                def handle_remove_click(e):
+                    try:
+                        if debt_index < len(self.debts_to_receive):
+                            self.debts_to_receive.pop(debt_index)
+                            self.save_data()
+                            self.update_all_views()
+
+                            self.show_snack_bar("🗑️ Dívida a receber removida!", "#DC2626")
+                    except Exception as ex:
+                        print(f"Erro ao remover dívida a receber: {ex}")
+
+                return handle_remove_click
+
+            # Botão de recebimento
+            if can_receive:
+                receive_button = ft.ElevatedButton(
+                    text="💸 Receber",
+                    on_click=create_receive_click_handler(i),
+                    bgcolor="#059669",
+                    color="#FFFFFF",
+                    height=32
+                )
+            else:
+                receive_button = ft.Container(
+                    content=ft.Text("✅ Recebida", size=12, weight=ft.FontWeight.BOLD, color="#059669"),
+                    bgcolor="#ECFDF5",
+                    border_radius=6,
+                    padding=ft.padding.symmetric(horizontal=12, vertical=6)
+                )
+
+            debt_card = ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        ft.Column([
+                            ft.Text(debt['name'], size=14, weight=ft.FontWeight.BOLD, color="#1F2937"),
+                            ft.Text(status_text, size=11, color=status_color),
+                            ft.Text(f"📅 Vence: {debt.get('due_date', 'N/A')}", size=10, color="#6B7280")
+                        ], expand=True, spacing=2),
+                        ft.IconButton(
+                            icon=ft.Icons.DELETE_OUTLINE,
+                            icon_color="#DC2626",
+                            icon_size=16,
+                            on_click=create_remove_click_handler(i),
+                            tooltip="Remover dívida a receber"
+                        )
+                    ]),
+                    ft.Container(height=8),
+                    ft.ProgressBar(
+                        value=min(progress, 1.0),
+                        bgcolor="#E5E7EB",
+                        color="#059669",
+                        height=6
+                    ),
+                    ft.Container(height=8),
+                    ft.Row([
+                        ft.Text(f"{received_amount:,.0f} / {debt['total_amount']:,.0f} Kz", size=11, color="#6B7280"),
+                        ft.Text(f"{progress * 100:.0f}%", size=11, weight=ft.FontWeight.BOLD, color="#059669")
+                    ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    ft.Container(height=8),
+                    receive_button
+                ]),
+                bgcolor="#FFFFFF",
+                border=ft.border.all(1, "#E5E7EB"),
+                border_radius=12,
+                padding=ft.padding.all(12),
+                margin=ft.margin.only(bottom=8)
+            )
+            self.debts_to_receive_list.controls.append(debt_card)
 
     def update_finances_view(self):
         """Atualiza vista de finanças"""
